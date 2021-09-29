@@ -13,7 +13,6 @@ pygame.font.init()
 myfont = pygame.font.SysFont('Tahoma', 16)
 myfont.bold = True
 
-
 PROGRAM_DIR = ""
 START_DIR = "D:\\"
 BACK_LABEL = "<-- Back"
@@ -21,6 +20,7 @@ BACK_LABEL = "<-- Back"
 REGULAR = 0
 WATCHED = 1
 FOLDER = 2
+SPECIAL = 3
 
 colorPal = {"orange":(227,122,64),
 			"green": (71,179,156),
@@ -89,6 +89,8 @@ class Button:
 			color = colorPal["green"]
 		if self.mode == FOLDER:
 			color = colorPal["yellow"]
+		if self.mode == SPECIAL:
+			color = colorPal["orange"]
 		if self.selected:
 			color = colorPal["red"]
 		pygame.draw.rect(win, color, (self.pos, self.size))
@@ -139,11 +141,11 @@ while run:
 			run = False
 		if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 			if state == "choose" and selectedElement:
-				if selectedElement.mode == FOLDER:
+				if selectedElement.mode == SPECIAL:
 					if selectedElement.label == BACK_LABEL:
 						currentDir = currentDir.replace(currentDir.split("\\")[-1], "")[:-1]
-					else:
-						currentDir += "\\" + selectedElement.label
+				elif selectedElement.mode == FOLDER:
+					currentDir += "\\" + selectedElement.label
 				else:
 					# add to watched list
 					if selectedElement.label in watched:
@@ -171,7 +173,7 @@ while run:
 		
 		# add back button
 		b = Button(BACK_LABEL)
-		b.mode = FOLDER
+		b.mode = SPECIAL
 		stack.elements.append(b)
 		
 		for file in files:
