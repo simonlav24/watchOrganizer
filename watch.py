@@ -1,189 +1,203 @@
 import os, subprocess
+if not os.path.exists("vector.py"):
+	print("fetching vector")
+	import urllib.request
+	with urllib.request.urlopen('https://raw.githubusercontent.com/simonlav24/wormsGame/master/vector.py') as f:
+		text = f.read().decode('utf-8')
+		with open("vector.py", "w+") as vectorpy:
+			vectorpy.write(text)
 from vector import *
 import pygame
 pygame.init()
 pygame.font.init()
-myfont = pygame.font.SysFont('Arial', 16)
+myfont = pygame.font.SysFont('Tahoma', 16)
+myfont.bold = True
 
-# TODO
-# actual path search like windows
-# create ini if not exists
-# download the vector addon
 
-PROGRAM_DIR = 
-SERIES_DIR = 
-VIDEO_FORMS = ["avi", "mp4", "mkv"]
+PROGRAM_DIR = ""
+START_DIR = "D:\\"
+BACK_LABEL = "<-- Back"
 
 REGULAR = 0
 WATCHED = 1
 FOLDER = 2
 
-textColor = (255,255,255)
-margin = 3
+colorPal = {"orange":(227,122,64),
+			"green": (71,179,156),
+			"red":   (222,91,74),
+			"black": (50,78,91),
+			"yellow":(239,202,78),
+			"white": (255,255,255)}
 
-win = pygame.display.set_mode((1280, 720))
+textColor = colorPal["white"]
+margin = 3
+scrollSpeed = 40
+
+win = pygame.display.set_mode((700 + 2 * margin, 720))
 pygame.display.set_caption('Watch')
 
 # read watched episodes
 watched = []
-with open("watch.ini", "r") as file:
-    for line in file.readlines():
-        watched.append(line[:-1])
+if os.path.exists("watch.ini"):
+	with open("watch.ini", "r") as file:
+		for line in file.readlines():
+			watched.append(line[:-1])
 
-def getEpisodesNames(path):
-    listed = os.listdir(path)
-    out = []
-    for file in listed:
-        for form in VIDEO_FORMS:
-            if form in file:
-                out.append(file)
-    return out
+def execute(path):
+	command = PROGRAM_DIR + " " + '"' + path + '"'
+	print("executing:", command)
+	os.system(command)
+	
+def listFiles(path):
+	out = []
+	scanned = os.listdir(path)
+	for file in scanned:
+		if os.path.isdir(path + "\\" + file):
+			out.append((file, True))
+	for file in scanned:
+		if not os.path.isdir(path + "\\" + file):
+			out.append((file, False))
+	return out
 
-def listFolders(path):
-    return [f.path.replace(".\\", "") for f in os.scandir(path) if f.is_dir()]
+def layerOffset(offset):
+	for element in layer0:
+		element.offset(offset)
 
 class Button:
-    def __init__(self, label="button"):
-        self.size = Vector(700, 25)
-        self.pos = Vector()
-        self.label = label
-        self.labelize(self.label)
-        self.selected = False
-        self.mode = REGULAR
-    def labelize(self, string):
-        self.label = string
-        self.surf = myfont.render(self.label, True, textColor)
-    def step(self):
-        global selectedElement
-        mouse = pygame.mouse.get_pos()
-        self.selected = False
-        if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + self.size[0]\
-                and mouse[1] > self.pos[1] and mouse[1] <= self.pos[1] + self.size[1]:
-            self.selected = True
-            selectedElement = self
-            return True
-    def draw(self):
-        color = (0,0,0)
-        if self.mode == WATCHED:
-            color = (0,0,100)
-        if self.selected:
-            color = (255,0,0)
-        pygame.draw.rect(win, color, (self.pos, self.size))
-        win.blit(self.surf, self.pos)
-        
-
+	def __init__(self, label="button"):
+		self.size = Vector(700, 25)
+		self.pos = Vector()
+		self.label = label
+		self.labelize(self.label)
+		self.selected = False
+		self.mode = REGULAR
+	def labelize(self, string):
+		self.label = string
+		self.surf = myfont.render(self.label, True, textColor)
+	def step(self):
+		global selectedElement
+		mouse = pygame.mouse.get_pos()
+		self.selected = False
+		if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + self.size[0]\
+				and mouse[1] > self.pos[1] and mouse[1] <= self.pos[1] + self.size[1]:
+			self.selected = True
+			selectedElement = self
+			return True
+	def draw(self):
+		color = colorPal["black"]
+		if self.mode == WATCHED:
+			color = colorPal["green"]
+		if self.mode == FOLDER:
+			color = colorPal["yellow"]
+		if self.selected:
+			color = colorPal["red"]
+		pygame.draw.rect(win, color, (self.pos, self.size))
+		win.blit(self.surf, self.pos + Vector(margin, 0))
+		
 class Stack:
-    def __init__(self):
-        self.elements = []
-        self.pos = Vector(margin, margin)
-        self.size = Vector()
-    def calculate(self):
-        posPointer = vectorCopy(self.pos)
-        for i in self.elements:
-            i.pos = vectorCopy(posPointer)
-            posPointer.y += i.size.y + margin
-    def step(self):
-        changed = False
-        for i in self.elements:
-            change = i.step()
-            if change:
-                changed = True
-        return changed
-    def draw(self):
-        for i in self.elements:
-            i.draw()
+	def __init__(self):
+		self.elements = []
+		self.pos = Vector(margin, margin)
+		self.size = Vector()
+	def calculate(self):
+		posPointer = vectorCopy(self.pos)
+		for i in self.elements:
+			i.pos = vectorCopy(posPointer)
+			posPointer.y += i.size.y + margin
+	def offset(self, offset):
+		global redraw
+		self.pos += offset
+		if self.pos.y >= 0:
+			self.pos.y = margin
+		self.calculate()
+		redraw = True
+	def step(self):
+		changed = False
+		for i in self.elements:
+			change = i.step()
+			if change:
+				changed = True
+		return changed
+	def draw(self):
+		for i in self.elements:
+			i.draw()
 
 state = None
-
-folders = listFolders(SERIES_DIR)
-state = "prepare series"
+state = "prepare"
 layer0 = []
 selectedElement = None
-buffer = []
+currentDir = START_DIR
 
-win.fill((255,255,255))
+win.fill(colorPal["white"])
 
 run = True
 while run:
-    redraw = False
+	redraw = False
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            run = False
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if state == "choose series":
-                state = "prepare episodes"
-                
-                buffer.append(selectedElement.label)
-            
-            if state == "choose episode":
-                # episode was chosen
-                state = "execute"
-                buffer.append(selectedElement.label)
-                selectedElement.mode = WATCHED
-                
-                # add to watched list
-                if selectedElement.label in watched:
-                    print("already watched this")
-                else:
-                    with open("watch.ini", "a") as file:
-                        file.write(selectedElement.label + "\n")
-                # open file to watch
-                file2watch = SERIES_DIR
-                for b in buffer:
-                    file2watch += "\\" + b
-                print("watch:", file2watch)
-                command = PROGRAM_DIR + " " + '"' + file2watch + '"'
-                print("executing:", command)
-                
-                os.system(command)
-                buffer = buffer[:-1]
-                state = "choose episode"
-                        
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_ESCAPE]:
-        run = False
-    
-    if state == "prepare series":
-        stack = Stack()
-        folders = listFolders(SERIES_DIR)
-        for folder in folders:
-            folder = folder.split("\\")[-1]
-            b = Button(folder)
-            stack.elements.append(b)
-        
-        stack.calculate()
-        stack.draw()
-        layer0.append(stack)
-        state = "choose series"
-    
-    if state == "prepare episodes":
-        layer0 = []
-        stack = Stack()
-        episodes = getEpisodesNames(SERIES_DIR + "\\" + selectedElement.label)
-        for episode in episodes:
-            b = Button(episode)
-            if episode in watched:
-                b.mode = WATCHED
-            stack.elements.append(b)
-        
-        stack.calculate()
-        stack.draw()
-        layer0.append(stack)
-        state = "choose episode"
-        
-    
-    # step
-    for element in layer0:
-        change = element.step()
-        if change:
-            redraw = True
-    
-    # draw
-    if redraw:
-        win.fill((255,255,255))
-        for element in layer0:
-            element.draw()
-    
-    pygame.display.update()
+	for event in pygame.event.get():
+		if event.type == pygame.QUIT:
+			run = False
+		if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+			if state == "choose" and selectedElement:
+				if selectedElement.mode == FOLDER:
+					if selectedElement.label == BACK_LABEL:
+						currentDir = currentDir.replace(currentDir.split("\\")[-1], "")[:-1]
+					else:
+						currentDir += "\\" + selectedElement.label
+				else:
+					# add to watched list
+					if selectedElement.label in watched:
+						pass
+					else:
+						with open("watch.ini", "a+") as file:
+							file.write(selectedElement.label + "\n")
+							watched.append(selectedElement.label)
+					if selectedElement.mode != "folder":
+						selectedElement.mode = WATCHED
+					execute(currentDir + "\\" + selectedElement.label)
+				state = "prepare"
+		if event.type == pygame.MOUSEBUTTONDOWN and event.button == 4: # scroll down
+			layerOffset(Vector(0, scrollSpeed))
+		if event.type == pygame.MOUSEBUTTONDOWN and event.button == 5: # scroll up
+			layerOffset(Vector(0, -scrollSpeed))
+		
+	keys = pygame.key.get_pressed()
+	if keys[pygame.K_ESCAPE]:
+		run = False
+	
+	if state == "prepare":
+		stack = Stack()
+		files = listFiles(currentDir)
+		
+		# add back button
+		b = Button(BACK_LABEL)
+		b.mode = FOLDER
+		stack.elements.append(b)
+		
+		for file in files:
+			b = Button(file[0])
+			if file[1]:
+				b.mode = FOLDER
+			if file[0] in watched:
+				b.mode = WATCHED
+			stack.elements.append(b)
+		
+		stack.calculate()
+		stack.draw()
+		layer0 = [stack]
+		state = "choose"
+	
+	# step
+	for element in layer0:
+		change = element.step()
+		if change:
+			redraw = True
+	
+	# draw
+	if redraw:
+		win.fill(colorPal["white"])
+		for element in layer0:
+			element.draw()
+	
+	pygame.display.update()
 pygame.quit()
