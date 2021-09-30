@@ -201,5 +201,5 @@ while run:
 		for element in layer0:
 			element.draw()
 	
-	pygame.display.update()
+		pygame.display.update()
 pygame.quit()
