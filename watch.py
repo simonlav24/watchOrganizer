@@ -185,7 +185,7 @@ while run:
 			stack.elements.append(b)
 		
 		stack.calculate()
-		stack.draw()
+		redraw = True
 		layer0 = [stack]
 		state = "choose"
 	
