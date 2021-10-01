@@ -52,37 +52,64 @@ def listFiles(path):
 	out = []
 	scanned = os.listdir(path)
 	for file in scanned:
+		if ".BIN" in file:
+			continue
 		if os.path.isdir(path + "\\" + file):
 			out.append((file, True))
-	for file in scanned:
-		if not os.path.isdir(path + "\\" + file):
+		else:
 			out.append((file, False))
+	
+	# sort folders first
+	index = 0
+	for i, f in enumerate(out):
+		if f[1]:
+			out[index], out[i] = out[i], out[index]
+			index += 1
 	return out
 
 def layerOffset(offset):
 	for element in layer0:
 		element.offset(offset)
 
-class Button:
-	def __init__(self, label="button"):
+def currentFolder():
+	return currentDir.split("\\")[-1]
+
+class Label:
+	def __init__(self, label="label"):
 		self.size = Vector(700, 25)
 		self.pos = Vector()
 		self.label = label
 		self.labelize(self.label)
-		self.selected = False
-		self.mode = REGULAR
+		self.initialize()
+	def initialize(self):
+		pass
 	def labelize(self, string):
 		self.label = string
 		self.surf = myfont.render(self.label, True, textColor)
 	def step(self):
+		pass
+	def draw(self):
+		color = colorPal["black"]
+		pygame.draw.rect(win, color, (self.pos, self.size))
+		win.blit(self.surf, self.pos + Vector(self.size.x/2, 0) - Vector(self.surf.get_size()[0]/2, 0))
+
+class Button(Label):
+	def initialize(self):
+		self.selected = False
+		self.mode = REGULAR
+		self.rating = 0
+	def step(self):
 		global selectedElement
 		mouse = pygame.mouse.get_pos()
-		self.selected = False
 		if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + self.size[0]\
 				and mouse[1] > self.pos[1] and mouse[1] <= self.pos[1] + self.size[1]:
+			if self.selected:
+				return False
 			self.selected = True
 			selectedElement = self
 			return True
+		else:
+			self.selected = False
 	def draw(self):
 		color = colorPal["black"]
 		if self.mode == WATCHED:
@@ -95,7 +122,7 @@ class Button:
 			color = colorPal["red"]
 		pygame.draw.rect(win, color, (self.pos, self.size))
 		win.blit(self.surf, self.pos + Vector(margin, 0))
-		
+
 class Stack:
 	def __init__(self):
 		self.elements = []
@@ -130,8 +157,6 @@ layer0 = []
 selectedElement = None
 currentDir = START_DIR
 
-win.fill(colorPal["white"])
-
 run = True
 while run:
 	redraw = False
@@ -162,6 +187,10 @@ while run:
 			layerOffset(Vector(0, scrollSpeed))
 		if event.type == pygame.MOUSEBUTTONDOWN and event.button == 5: # scroll up
 			layerOffset(Vector(0, -scrollSpeed))
+		if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKSPACE:
+			if state == "choose":
+				currentDir = currentDir.replace(currentDir.split("\\")[-1], "")[:-1]
+				state = "prepare"
 		
 	keys = pygame.key.get_pressed()
 	if keys[pygame.K_ESCAPE]:
@@ -170,6 +199,10 @@ while run:
 	if state == "prepare":
 		stack = Stack()
 		files = listFiles(currentDir)
+		
+		# add folder label
+		l = Label(currentFolder())
+		stack.elements.append(l)
 		
 		# add back button
 		b = Button(BACK_LABEL)
