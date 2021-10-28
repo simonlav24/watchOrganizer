@@ -1,4 +1,4 @@
-import os, subprocess
+import os, subprocess, ast
 if not os.path.exists("vector.py"):
 	print("fetching vector")
 	import urllib.request
@@ -35,6 +35,8 @@ scrollSpeed = 40
 
 win = pygame.display.set_mode((700 + 2 * margin, 720))
 pygame.display.set_caption('Watch')
+icon = pygame.image.load('watch.png')
+pygame.display.set_icon(icon)
 
 # read watched episodes
 watched = []
@@ -42,6 +44,13 @@ if os.path.exists("watch.ini"):
 	with open("watch.ini", "r") as file:
 		for line in file.readlines():
 			watched.append(line[:-1])
+
+# read folders dict
+folderDict = {}
+if os.path.exists("folders.ini"):
+	with open("folders.ini", "r") as file:
+		line = file.readline()
+		folderDict = ast.literal_eval(line)
 
 def execute(path):
 	command = PROGRAM_DIR + " " + '"' + path + '"'
@@ -74,6 +83,11 @@ def layerOffset(offset):
 def currentFolder():
 	return currentDir.split("\\")[-1]
 
+def saveFolderDict():
+	file = open("folders.ini", 'w')
+	file.write(str(folderDict))
+	file.close()
+
 class Label:
 	def __init__(self, label="label"):
 		self.size = Vector(700, 25)
@@ -98,6 +112,7 @@ class Button(Label):
 		self.selected = False
 		self.mode = REGULAR
 		self.rating = 0
+		self.specialPoint = False
 	def step(self):
 		global selectedElement
 		mouse = pygame.mouse.get_pos()
@@ -122,7 +137,10 @@ class Button(Label):
 			color = colorPal["red"]
 		pygame.draw.rect(win, color, (self.pos, self.size))
 		win.blit(self.surf, self.pos + Vector(margin, 0))
-
+		if self.specialPoint:
+			poly = [Vector(self.size.x - margin, margin), Vector(self.size.x - margin, self.size.y - margin), Vector(self.size.x - margin - self.size.y, self.size.y//2)]
+			pygame.draw.polygon(win, colorPal["black"], [self.pos + i for i in poly])
+			
 class Stack:
 	def __init__(self):
 		self.elements = []
@@ -166,11 +184,18 @@ while run:
 			run = False
 		if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 			if state == "choose" and selectedElement:
+				# special buttons
 				if selectedElement.mode == SPECIAL:
 					if selectedElement.label == BACK_LABEL:
 						currentDir = currentDir.replace(currentDir.split("\\")[-1], "")[:-1]
+				# folder buttons
 				elif selectedElement.mode == FOLDER:
+					prevfolder = currentFolder()
 					currentDir += "\\" + selectedElement.label
+					currentFolderStr = currentFolder()
+					folderDict[prevfolder] = currentFolderStr
+					saveFolderDict()
+				# file buttons
 				else:
 					# add to watched list
 					if selectedElement.label in watched:
@@ -209,10 +234,17 @@ while run:
 		b.mode = SPECIAL
 		stack.elements.append(b)
 		
+		# print(currentFolder())
+		
 		for file in files:
 			b = Button(file[0])
 			if file[1]:
 				b.mode = FOLDER
+				# print("current:", currentFolder())
+				if currentFolder() in folderDict.keys():
+					# print("last:", folderDict[currentFolder()])
+					if folderDict[currentFolder()] == file[0]:
+						b.specialPoint = True
 			if file[0] in watched:
 				b.mode = WATCHED
 			stack.elements.append(b)
