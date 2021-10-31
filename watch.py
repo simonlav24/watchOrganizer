@@ -22,14 +22,27 @@ WATCHED = 1
 FOLDER = 2
 SPECIAL = 3
 
-colorPal = {"orange":(227,122,64),
-			"green": (71,179,156),
-			"red":   (222,91,74),
-			"black": (50,78,91),
-			"yellow":(239,202,78),
-			"white": (255,255,255)}
+colorPal = {"font" : pygame.font.SysFont('Tahoma', 16),
+            "special":(227,122,64),  
+			"watched": (71,179,156), 
+			"selected":   (222,91,74),  
+			"folders": (50,78,91),    
+			"button":(239,202,78),  
+			"background": (255,255,255),
+            "text": (255,255,255)}
+            
+colorPalNet = {"font" : pygame.font.Font(".\BebasNeue-Regular.ttf", 22),
+            "special":(19,24,52),
+			"watched": (222,222,222),   
+			"selected":  (230,230,9) ,#
+			"folders": (193,7,30),  #
+			"button":(67,70,94),#  
+			"background": (19,24,52),#
+            "text": (255,255,255)}#
 
-textColor = colorPal["white"]
+theme = colorPalNet
+
+textColor = theme["text"]
 margin = 3
 scrollSpeed = 40
 
@@ -99,11 +112,11 @@ class Label:
 		pass
 	def labelize(self, string):
 		self.label = string
-		self.surf = myfont.render(self.label, True, textColor)
+		self.surf = theme["font"].render(self.label, True, textColor)
 	def step(self):
 		pass
 	def draw(self):
-		color = colorPal["black"]
+		color = theme["folders"]
 		pygame.draw.rect(win, color, (self.pos, self.size))
 		win.blit(self.surf, self.pos + Vector(self.size.x/2, 0) - Vector(self.surf.get_size()[0]/2, 0))
 
@@ -126,20 +139,20 @@ class Button(Label):
 		else:
 			self.selected = False
 	def draw(self):
-		color = colorPal["black"]
+		color = theme["button"]
 		if self.mode == WATCHED:
-			color = colorPal["green"]
+			color = theme["watched"]
 		if self.mode == FOLDER:
-			color = colorPal["yellow"]
+			color = theme["folders"]
 		if self.mode == SPECIAL:
-			color = colorPal["orange"]
+			color = theme["special"]
 		if self.selected:
-			color = colorPal["red"]
+			color = theme["selected"]
 		pygame.draw.rect(win, color, (self.pos, self.size))
 		win.blit(self.surf, self.pos + Vector(margin, 0))
 		if self.specialPoint:
 			poly = [Vector(self.size.x - margin, margin), Vector(self.size.x - margin, self.size.y - margin), Vector(self.size.x - margin - self.size.y, self.size.y//2)]
-			pygame.draw.polygon(win, colorPal["black"], [self.pos + i for i in poly])
+			pygame.draw.polygon(win, theme["special"], [self.pos + i for i in poly])
 			
 class Stack:
 	def __init__(self):
@@ -262,7 +275,7 @@ while run:
 	
 	# draw
 	if redraw:
-		win.fill(colorPal["white"])
+		win.fill(theme["background"])
 		for element in layer0:
 			element.draw()
 	
