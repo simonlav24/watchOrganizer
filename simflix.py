@@ -1,4 +1,4 @@
-import pygame, os, ast, random
+import pygame, os, ast, random, cv2
 from vector import *
 pygame.init()
 
@@ -31,9 +31,10 @@ def addToWatched(path):
 
 folderDict = {}
 if os.path.exists("folders.ini"):
-	with open("folders.ini", "r") as file:
-		line = file.readline()
-		folderDict = ast.literal_eval(line)
+    with open("folders.ini", "r") as file:
+        line = file.readline()
+        print(line)
+        folderDict = ast.literal_eval(line)
 
 win = pygame.display.set_mode((1440, 720), pygame.RESIZABLE)
 clock = pygame.time.Clock()
@@ -43,7 +44,7 @@ simflix = pygame.image.load('./assets/simflix.png')
 simflix = pygame.transform.smoothscale(simflix, (simflix.get_width()*0.4, simflix.get_height()*0.4))
 
 def execute(path):
-	command = path
+	command = '"' + path + '"'
 	print("executing:", command)
 	os.system(command)
 
@@ -209,7 +210,7 @@ class Frame:
         self.watched = 0
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
-    def setSurf(self, imagePath=None, color=(255,255,255), name=None):
+    def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
         self.surf = pygame.Surface(frameSize, pygame.SRCALPHA)
         self.surf.fill((0,0,0))
         if imagePath:
@@ -223,8 +224,17 @@ class Frame:
             # blit image to surf in center
             self.surf.blit(image, ((frameSize[0] - image.get_width()) / 2, (frameSize[1] - image.get_height()) / 2))
 
+        elif surf:
+            if surf.get_width() > surf.get_height():
+                surf = pygame.transform.scale(surf, (frameSize[0], frameSize[0] * surf.get_height() // surf.get_width()))
+            else:
+                surf = pygame.transform.scale(surf, (frameSize[1] * surf.get_width() // surf.get_height(), frameSize[1]))
+
+            # blit image to surf in center
+            self.surf.blit(surf, ((frameSize[0] - surf.get_width()) / 2, (frameSize[1] - surf.get_height()) / 2))
         else:
             self.surf.fill(color)
+
 
         # blit name
         if name:
@@ -253,6 +263,38 @@ class Frame:
             pygame.draw.line(win, (91,91,91), start, end, 3)
             pygame.draw.line(win, RED, start, start + (end - start) * self.watched, 3)
 
+def createThumbnail(path):
+    importedVideo = cv2.VideoCapture(path)
+    width = int(importedVideo.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(importedVideo.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    length = int(importedVideo.get(cv2.CAP_PROP_FRAME_COUNT))
+    importedVideo.set(cv2.CAP_PROP_POS_FRAMES, length // 2)
+    ret, frame = importedVideo.read()
+    # convert frame to pygame surface
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = pygame.image.frombuffer(frame, (width, height), 'RGB')
+    return frame
+
+def checkThumbnail(filePath):
+    fileName = os.path.basename(filePath)
+
+    if not os.path.exists("./assets/thumbnails"):
+        os.mkdir("./assets/thumbnails")
+
+    thumbnailPath = "./assets/thumbnails/" + fileName.replace('.' + fileName.split('.')[-1], '') + '.jpg'
+
+    if not os.path.exists(thumbnailPath):
+        thumbnail = createThumbnail(filePath)
+        if thumbnail.get_width() > thumbnail.get_height():
+            thumbnail = pygame.transform.scale(thumbnail, (frameSize[0], frameSize[0] * thumbnail.get_height() // thumbnail.get_width()))
+        else:
+            thumbnail = pygame.transform.scale(thumbnail, (frameSize[1] * thumbnail.get_width() // thumbnail.get_height(), frameSize[1]))
+        pygame.image.save(thumbnail, thumbnailPath)
+
+    else:
+        thumbnail = pygame.image.load(thumbnailPath)
+    return thumbnail
+
 def loadFolderToSlider(path, sliderIndex, title):
     frameSlider = Gui().createFrameSlider(title)
     for i, file in enumerate(os.listdir(path)):
@@ -267,7 +309,8 @@ def loadFolderToSlider(path, sliderIndex, title):
             frameSlider.addFrame(f)
         elif file.split('.')[-1] in videoFormats:
             f = Frame()
-            f.setSurf(color=(20, 9, 229), name=os.path.basename(path + '/' + file))
+            thumbnail = checkThumbnail(path + '/' + file)
+            f.setSurf(color=(20, 9, 229), name=os.path.basename(path + '/' + file), surf=thumbnail)
             f.path = path + '/' + file
             baseName = os.path.basename(file)
             if baseName in watched:
