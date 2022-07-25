@@ -57,17 +57,20 @@ class Gui:
         return cls._instance
     def initiate(self):
         self.elements = []
+        self.animations = []
         self.selectedFrame = None
         self.selectedFrameSlider = None
-    def createFrameSlider(self, title):
-        f = FrameSlider(title)
-        f.pos = Vector(5, 100 + len(self._instance.elements) * (frameSize[1] + 100))
-        return f
+    def reposition(self):
+        for i, element in enumerate(self.elements):
+            element.pos = Vector(5, 100 + i * (frameSize[1] + 100))
+            element.reposition()
     def select(self, frame):
         self.selectedFrame = frame
     def step(self):
         for element in self.elements:
             element.step()
+        for animation in self.animations:
+            animation.step()
         if self.selectedFrame:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
             if not self.selectedFrame.selected:
@@ -124,6 +127,11 @@ class FrameSlider:
         pos = Vector(len(self.frames) * (8 + frameSize[0]), 5 + self.titleSurf.get_height())
         self.frames.append(frame)
         frame.setPos(pos)
+    
+    def reposition(self):
+        for i, frame in enumerate(self.frames):
+            frame.setPos(Vector(i * (8 + frameSize[0]), 5 + self.titleSurf.get_height()))
+
     def step(self):
         for frame in self.frames:
             frame.step()
@@ -172,7 +180,7 @@ class FrameSlider:
 
 class AnimatorSlider:
     def __init__(self, slider, offset):
-        Gui().elements.append(self)
+        Gui().animations.append(self)
         self.slider = slider
         self.offset = offset
 
@@ -194,9 +202,6 @@ class AnimatorSlider:
         if self.t >= 1:
             for i, frame in enumerate(self.slider.frames):
                 frame.pos = self.framesFinalValues[i]
-
-    def draw(self):
-        pass
 
 class Frame:
     def __init__(self):
@@ -275,7 +280,7 @@ def createThumbnail(path):
     frame = pygame.image.frombuffer(frame, (width, height), 'RGB')
     return frame
 
-def checkThumbnail(filePath):
+def checkAndCreateThumbnail(filePath):
     fileName = os.path.basename(filePath)
 
     if not os.path.exists("./assets/thumbnails"):
@@ -295,8 +300,42 @@ def checkThumbnail(filePath):
         thumbnail = pygame.image.load(thumbnailPath)
     return thumbnail
 
-def loadFolderToSlider(path, sliderIndex, title):
-    frameSlider = Gui().createFrameSlider(title)
+def checkThumbnail(filePath):
+    fileName = os.path.basename(filePath)
+
+    if not os.path.exists("./assets/thumbnails"):
+        os.mkdir("./assets/thumbnails")
+
+    thumbnailPath = "./assets/thumbnails/" + fileName.replace('.' + fileName.split('.')[-1], '') + '.jpg'
+
+    if not os.path.exists(thumbnailPath):
+        return False
+    else:
+        return True
+
+def folderThumbnail(folderPath):
+    availableThumbnail = []
+    for file in os.listdir(folderPath):
+        # if not folder
+        if not os.path.isdir(folderPath + "/" + file):
+            # check if have thumbnail
+            hasThumbnail = checkThumbnail(folderPath + "/" + file)
+            if hasThumbnail:
+                availableThumbnail.append(folderPath + "/" + file)
+        # if folder
+        else:
+            thumbnail = folderThumbnail(folderPath + "/" + file)
+            if thumbnail:
+                availableThumbnail.append(thumbnail)
+    if len(availableThumbnail) == 0:
+        return None
+    else:
+        return random.choice(availableThumbnail)
+
+
+
+def loadFolderToSlider(path, sliderIndex=-1, title="untitled"):
+    frameSlider = FrameSlider(title)
     for i, file in enumerate(os.listdir(path)):
         if i == 20: break
         if file.split('.')[-1] in imagesFormats:
@@ -309,7 +348,7 @@ def loadFolderToSlider(path, sliderIndex, title):
             frameSlider.addFrame(f)
         elif file.split('.')[-1] in videoFormats:
             f = Frame()
-            thumbnail = checkThumbnail(path + '/' + file)
+            thumbnail = checkAndCreateThumbnail(path + '/' + file)
             f.setSurf(color=(20, 9, 229), name=os.path.basename(path + '/' + file), surf=thumbnail)
             f.path = path + '/' + file
             baseName = os.path.basename(file)
@@ -318,19 +357,27 @@ def loadFolderToSlider(path, sliderIndex, title):
             frameSlider.addFrame(f)
         elif os.path.isdir(path + '/' + file):
             f = Frame()
-            f.setSurf(color=(229, 229, 9), name=os.path.basename(path + '/' + file))
+            thumbnail = folderThumbnail(path + '/' + file)
+            if thumbnail:
+                f.setSurf(color=(20, 9, 229), name=os.path.basename(path + '/' + file), surf=checkAndCreateThumbnail(thumbnail))
+            else:
+                f.setSurf(color=(229, 229, 9), name=os.path.basename(path + '/' + file))
             f.path = path + '/' + file
             baseName = os.path.basename(file)
             if baseName in watched:
                 f.watched = 1
             f.folder = True
             frameSlider.addFrame(f)
-    Gui().elements.insert(sliderIndex, frameSlider)
+    if sliderIndex == -1:
+        Gui().elements.append(frameSlider)
+    else:
+        Gui().elements.insert(sliderIndex, frameSlider)
+    Gui().reposition()
 
 def init():
     for folder in folderDict:
         path = folderDict[folder]
-        loadFolderToSlider(path, -1, folder)
+        loadFolderToSlider(path, title=folder)
 
 gui = Gui()
 init()
