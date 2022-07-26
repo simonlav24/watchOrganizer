@@ -17,10 +17,18 @@ arrowSize = Vector(14, 28)
 RED = (229,9,20)
 
 watched = []
-if os.path.exists("watch.ini"):
-	with open("watch.ini", "r") as file:
-		for line in file.readlines():
-			watched.append(line[:-1])
+
+# frequancy = {}
+# if os.path.exists("frequancy.ini"):
+#     with open("frequancy.ini", "r") as file:
+#         for line in file.readlines():
+#             frequancy[line[:-1]] = ast.literal_eval(line[:-1])
+
+def loadWatched(watched):
+    if os.path.exists("watch.ini"):
+	    with open("watch.ini", "r") as file:
+		    for line in file.readlines():
+			    watched.append(line[:-1])
 
 def addToWatched(path):
     baseName = os.path.basename(path)
@@ -29,11 +37,23 @@ def addToWatched(path):
     with open("watch.ini", "a+") as file:
         file.write(baseName + "\n")
 
+# def addToFrequancy(path):
+#     return
+#     baseName = os.path.basename(path)
+#     if baseName not in frequancy:
+#         frequancy[baseName] = 1
+#     else:
+#         frequancy[baseName] += 1
+#     with open("frequancy.ini", "a+") as file:
+#         file.write(baseName + " = " + str(frequancy[baseName]) + "\n")
+
+watched = []
+loadWatched(watched)
+
 folderDict = {}
 if os.path.exists("folders.ini"):
     with open("folders.ini", "r") as file:
         line = file.readline()
-        print(line)
         folderDict = ast.literal_eval(line)
 
 win = pygame.display.set_mode((1440, 720), pygame.RESIZABLE)
@@ -87,17 +107,20 @@ class Gui:
             if event.button == 1:
                 mouse = event.pos
                 # slide
-                clicked = False
                 if self.selectedFrameSlider:
                     if mouse[0] < 50:
                         self.selectedFrameSlider.slide("left")    
-                        clicked = True
+                        return
                     elif mouse[0] > win.get_width() - 50:
                         self.selectedFrameSlider.slide("right")
-                        clicked = True
-                if clicked:
-                    return
-                
+                        return
+                    
+                    if mouse[0] > win.get_width() - self.selectedFrameSlider.backSurf.get_width() - 50 - 10 and mouse[1] > self.selectedFrameSlider.pos.y and mouse[1] < self.selectedFrameSlider.pos.y + self.selectedFrameSlider.backSurf.get_height():
+                        path = os.path.dirname(self.selectedFrameSlider.path)
+                        sliderIndex = self.elements.index(self.selectedFrameSlider)
+                        self.elements.remove(self.selectedFrameSlider)
+                        loadFolderToSlider(path, sliderIndex, os.path.basename(path))
+
                 # open file
                 if self.selectedFrame:
                     if not self.selectedFrame.folder:
@@ -112,15 +135,19 @@ class Gui:
                         sliderIndex = self.elements.index(self.selectedFrameSlider)
                         self.elements.remove(self.selectedFrameSlider)
                         loadFolderToSlider(path, sliderIndex, os.path.basename(path))
+                        # addToFrequancy(path)
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
                 
 class FrameSlider:
-    def __init__(self, title):
+    def __init__(self, title, path=''):
         self.frames = []
         self.title = title
         self.titleSurf = titleFont.render(title, True, (255,255,255))
+        self.backSurf = titleFont.render("Back", True, (255,255,255))
         self.pos = Vector()
         self.slideIndex = 0
         self.selected = False
+        self.path = path
 
     def addFrame(self, frame):
         frame.parent = self
@@ -144,6 +171,7 @@ class FrameSlider:
                 
     def draw(self):
         win.blit(self.titleSurf, (self.pos[0] + 10, self.pos[1]))
+        win.blit(self.backSurf, (win.get_width() - self.backSurf.get_width() - 10 - 50, self.pos[1]))
         for frame in self.frames:
             frame.draw()
         if self.selected:
@@ -332,10 +360,8 @@ def folderThumbnail(folderPath):
     else:
         return random.choice(availableThumbnail)
 
-
-
 def loadFolderToSlider(path, sliderIndex=-1, title="untitled"):
-    frameSlider = FrameSlider(title)
+    frameSlider = FrameSlider(title, path=path)
     for i, file in enumerate(os.listdir(path)):
         if i == 20: break
         if file.split('.')[-1] in imagesFormats:
