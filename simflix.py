@@ -1,4 +1,4 @@
-import pygame, os, ast, random, cv2
+import pygame, os, ast, random, cv2, re, subprocess
 from vector import *
 pygame.init()
 
@@ -60,13 +60,44 @@ win = pygame.display.set_mode((1440, 720), pygame.RESIZABLE)
 clock = pygame.time.Clock()
 fps = 60
 pygame.display.set_caption('Simflix')
-simflix = pygame.image.load('./assets/simflix.png')
-simflix = pygame.transform.smoothscale(simflix, (simflix.get_width()*0.4, simflix.get_height()*0.4))
+simflixSurf = pygame.image.load('./assets/simflix.png').convert_alpha()
+simflixSurf = pygame.transform.smoothscale(simflixSurf, (simflixSurf.get_width()*0.4, simflixSurf.get_height()*0.4))
+folderIconSurf = pygame.image.load('./assets/folderIcon.png').convert_alpha()
+folderIconSurf = pygame.transform.smoothscale(folderIconSurf, (folderIconSurf.get_width()*0.06, folderIconSurf.get_height()*0.06))
 
 def execute(path):
-	command = '"' + path + '"'
-	print("executing:", command)
-	os.system(command)
+    command = '"' + path + '"'
+    print("executing:", command)
+    subprocess.Popen(command, shell=True)
+    # os.system(command)
+
+def handleName(name):
+    name = re.sub(r'\([^()]*\)', '', name)
+    name = re.sub(r'\[[^\]]*\]', '', name)
+    if '.' in name:
+        name = '.'.join(name.split('.')[0:-1]).replace('.', ' ')
+
+    se = re.search(r'(s|S)\d\d', name)
+    ep = re.search(r'(e|E)\d\d', name)
+    
+    name = re.sub(r'(S|s)\d\d', '', name)
+    name = re.sub(r'(E|e)\d\d', '', name)
+    name = re.sub(r'\d+p', '', name)
+    name = re.sub(r'\s+([^\s\w]|_)+\s+', ' ', name)
+    
+    for word in name.split(' '):
+        if sum(1 for c in word if c.isupper()) >= 2:
+            name = name.replace(word, '')
+    name = re.sub(r'\s+', ' ', name)
+    
+    name = re.sub(r'[a-zA-Z]\d\d\d', '', name)
+    name = re.sub(r'\s+$', '', name)
+    name = re.sub(r'\-\-+', '', name)
+
+    if se != None and ep != None:
+        name += " " + se.group(0) + ep.group(0)
+
+    return name
 
 class Gui:
     _instance = None
@@ -141,8 +172,8 @@ class Gui:
 class FrameSlider:
     def __init__(self, title, path=''):
         self.frames = []
-        self.title = title
-        self.titleSurf = titleFont.render(title, True, (255,255,255))
+        self.title = handleName(title)
+        self.titleSurf = titleFont.render(self.title, True, (255,255,255))
         self.backSurf = titleFont.render("Back", True, (255,255,255))
         self.pos = Vector()
         self.slideIndex = 0
@@ -232,18 +263,20 @@ class AnimatorSlider:
                 frame.pos = self.framesFinalValues[i]
 
 class Frame:
-    def __init__(self):
+    def __init__(self, folder=False):
         self.pos = Vector(0,0)
+
+        self.folder = folder
         self.setSurf()
         self.selected = False
         self.parent = None
         self.path = None
 
-        self.folder = False
         self.watched = 0
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
+        
         self.surf = pygame.Surface(frameSize, pygame.SRCALPHA)
         self.surf.fill((0,0,0))
         if imagePath:
@@ -268,9 +301,12 @@ class Frame:
         else:
             self.surf.fill(color)
 
+        if self.folder:
+            self.surf.blit(folderIconSurf, (5,5))
 
         # blit name
         if name:
+            name = handleName(name)
             nameSurf = nameFont.render(name, True, (255,255,255))
             self.surf.blit(nameSurf, (frameSize[0]/2 - nameSurf.get_width()/2, frameSize[1] - nameSurf.get_height()))
 
@@ -319,9 +355,9 @@ def checkAndCreateThumbnail(filePath):
     if not os.path.exists(thumbnailPath):
         thumbnail = createThumbnail(filePath)
         if thumbnail.get_width() > thumbnail.get_height():
-            thumbnail = pygame.transform.scale(thumbnail, (frameSize[0], frameSize[0] * thumbnail.get_height() // thumbnail.get_width()))
+            thumbnail = pygame.transform.smoothscale(thumbnail, (frameSize[0], frameSize[0] * thumbnail.get_height() // thumbnail.get_width()))
         else:
-            thumbnail = pygame.transform.scale(thumbnail, (frameSize[1] * thumbnail.get_width() // thumbnail.get_height(), frameSize[1]))
+            thumbnail = pygame.transform.smoothscale(thumbnail, (frameSize[1] * thumbnail.get_width() // thumbnail.get_height(), frameSize[1]))
         pygame.image.save(thumbnail, thumbnailPath)
 
     else:
@@ -382,7 +418,7 @@ def loadFolderToSlider(path, sliderIndex=-1, title="untitled"):
                 f.watched = 1
             frameSlider.addFrame(f)
         elif os.path.isdir(path + '/' + file):
-            f = Frame()
+            f = Frame(folder=True)
             thumbnail = folderThumbnail(path + '/' + file)
             if thumbnail:
                 f.setSurf(color=(20, 9, 229), name=os.path.basename(path + '/' + file), surf=checkAndCreateThumbnail(thumbnail))
@@ -392,7 +428,6 @@ def loadFolderToSlider(path, sliderIndex=-1, title="untitled"):
             baseName = os.path.basename(file)
             if baseName in watched:
                 f.watched = 1
-            f.folder = True
             frameSlider.addFrame(f)
     if sliderIndex == -1:
         Gui().elements.append(frameSlider)
@@ -426,7 +461,7 @@ while not done:
     gui.step()
 
     win.fill(bgColor)
-    win.blit(simflix, (win.get_width() - simflix.get_width() - 20, 5))
+    win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
     gui.draw()
 
     pygame.display.update()
