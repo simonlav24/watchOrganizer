@@ -7,6 +7,7 @@ frameSize = (290, 164)
 
 imagesFormats = ['png', 'jpg', 'jpeg', 'bmp']
 videoFormats = ['mp4', 'avi', 'mov', 'flv', 'wmv', 'mpg', 'mpeg', 'mkv']
+acceptableFormats = imagesFormats + videoFormats
 
 titleFont = pygame.font.SysFont('Tahoma', 26, True)
 nameFont = pygame.font.SysFont('Tahoma', 16, False)
@@ -23,6 +24,9 @@ watched = []
 #     with open("frequancy.ini", "r") as file:
 #         for line in file.readlines():
 #             frequancy[line[:-1]] = ast.literal_eval(line[:-1])
+
+def isAcceptableFormat(fileName):
+    return fileName.split('.')[-1] in acceptableFormats
 
 def loadWatched(watched):
     if os.path.exists("watch.ini"):
@@ -65,6 +69,9 @@ simflixSurf = pygame.transform.smoothscale(simflixSurf, (simflixSurf.get_width()
 folderIconSurf = pygame.image.load('./assets/folderIcon.png').convert_alpha()
 folderIconSurf = pygame.transform.smoothscale(folderIconSurf, (folderIconSurf.get_width()*0.06, folderIconSurf.get_height()*0.06))
 
+highlightSurf = pygame.Surface((frameSize[0], frameSize[1]), pygame.SRCALPHA)
+pygame.draw.polygon(highlightSurf, (70,70,70), [(frameSize[0] * 0.6, 0), (frameSize[0] * 0.9, 0), (frameSize[0] * 0.9 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.6 - 0.3 * frameSize[0], frameSize[1])])
+pygame.draw.polygon(highlightSurf, (70,70,70), [(frameSize[0] * 0.45, 0), (frameSize[0] * 0.5, 0), (frameSize[0] * 0.5 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.45 - 0.3 * frameSize[0], frameSize[1])])
 def execute(path):
     command = '"' + path + '"'
     print("executing:", command)
@@ -72,6 +79,7 @@ def execute(path):
     # os.system(command)
 
 def handleName(name):
+    nameBu = name
     name = re.sub(r'\([^()]*\)', '', name)
     name = re.sub(r'\[[^\]]*\]', '', name)
     if '.' in name:
@@ -97,6 +105,8 @@ def handleName(name):
     if se != None and ep != None:
         name += " " + se.group(0) + ep.group(0)
 
+    if name == "" or name == " ":
+        name = nameBu
     return name
 
 class Gui:
@@ -228,7 +238,7 @@ class FrameSlider:
         elif button == 'right':
             # slide left
             self.slideIndex += framesInWin
-            if self.slideIndex > len(self.frames) - framesInWin:
+            if self.slideIndex > len(self.frames):# - framesInWin:
                 self.slideIndex = len(self.frames) - framesInWin
                 animate = False
             else:
@@ -273,6 +283,8 @@ class Frame:
         self.path = None
 
         self.watched = 0
+        self.animationState = "idle"
+        self.animOffset = 0
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
@@ -321,30 +333,62 @@ class Frame:
         if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + frameSize[0]\
                 and mouse[1] > self.pos[1] and mouse[1] <= self.pos[1] + frameSize[1]:
             self.selected = True
+            self.animationState = "hover"
             Gui().select(self)
         else:
             self.selected = False
+            self.animationState = "idle"
+        
+        if self.animationState == "idle":
+            direction = (0 - self.animOffset)
+            self.animOffset += direction * 0.05
+        if self.animationState == "hover":
+            direction = (1 - self.animOffset)
+            self.animOffset += direction * 0.1
     def draw(self):
-        win.blit(self.surf, self.pos)
+        if self.animOffset > 0.01:
+            surf = self.surf.copy()
+            posx =  self.animOffset * frameSize[0] - frameSize[0]
+            surf.blit(highlightSurf, (posx,0), special_flags=pygame.BLEND_RGBA_ADD)
+            win.blit(surf, self.pos)
+        else:
+            win.blit(self.surf, self.pos)
+        
         if self.watched != 0:
             start = self.pos + Vector(frameSize[0]/2 - 80, frameSize[1] + 10)
             end = self.pos + Vector(frameSize[0]/2 + 80, frameSize[1] + 10)
             pygame.draw.line(win, (91,91,91), start, end, 3)
             pygame.draw.line(win, RED, start, start + (end - start) * self.watched, 3)
+        # pygame.draw.circle(win, (255,255,255), (int(self.pos[0] + frameSize[0]/2), int(self.pos[1] + frameSize[1]/2)), int(self.animOffset * frameSize[0]/2), 0)
 
-def createThumbnail(path):
-    importedVideo = cv2.VideoCapture(path)
+def createThumbnail(filePath):
+    """ returns thumbnail Surface from path file """
+    importedVideo = cv2.VideoCapture(filePath)
     width = int(importedVideo.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(importedVideo.get(cv2.CAP_PROP_FRAME_HEIGHT))
     length = int(importedVideo.get(cv2.CAP_PROP_FRAME_COUNT))
     importedVideo.set(cv2.CAP_PROP_POS_FRAMES, length // 2)
     ret, frame = importedVideo.read()
+    if ret == False:
+        return None
     # convert frame to pygame surface
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     frame = pygame.image.frombuffer(frame, (width, height), 'RGB')
     return frame
 
-def checkAndCreateThumbnail(filePath):
+def checkAndCreateThumbnailPath(filePath):
+    """ check if there is a tumbnail, if there is, return it as path string, if not, create one and return it as path string"""
+    fileName = os.path.basename(filePath)
+
+    if not os.path.exists("./assets/thumbnails"):
+        os.mkdir("./assets/thumbnails")
+
+    thumbnailPath = "./assets/thumbnails/" + fileName.replace('.' + fileName.split('.')[-1], '') + '.jpg'
+    checkAndCreateThumbnailSurf(filePath)
+    return thumbnailPath
+
+def checkAndCreateThumbnailSurf(filePath):
+    """ check if there is a tumbnail, if there is, return it as Surface, if not, create one and return it """
     fileName = os.path.basename(filePath)
 
     if not os.path.exists("./assets/thumbnails"):
@@ -354,6 +398,8 @@ def checkAndCreateThumbnail(filePath):
 
     if not os.path.exists(thumbnailPath):
         thumbnail = createThumbnail(filePath)
+        if not thumbnail:
+            return None
         if thumbnail.get_width() > thumbnail.get_height():
             thumbnail = pygame.transform.smoothscale(thumbnail, (frameSize[0], frameSize[0] * thumbnail.get_height() // thumbnail.get_width()))
         else:
@@ -365,22 +411,49 @@ def checkAndCreateThumbnail(filePath):
     return thumbnail
 
 def checkThumbnail(filePath):
-    fileName = os.path.basename(filePath)
+    """ check if there is a tumbnail already created for this file """
+    fileBaseName = os.path.basename(filePath)
 
     if not os.path.exists("./assets/thumbnails"):
         os.mkdir("./assets/thumbnails")
 
-    thumbnailPath = "./assets/thumbnails/" + fileName.replace('.' + fileName.split('.')[-1], '') + '.jpg'
+    thumbnailPath = "./assets/thumbnails/" + fileBaseName.replace('.' + fileBaseName.split('.')[-1], '') + '.jpg'
 
     if not os.path.exists(thumbnailPath):
         return False
     else:
         return True
 
+def forceThumbnail(folderPath):
+    """ find the first file in the folder that can be thumbnailed and create a thumbnail for it and return as path string"""
+    availableThumbnail = None
+    # go over files
+    for file in os.listdir(folderPath):
+        if not isAcceptableFormat(file):
+            continue
+
+        # if folder, skip
+        if os.path.isdir(folderPath + "/" + file):
+            continue
+
+        availableThumbnail = checkAndCreateThumbnailPath(folderPath + "/" + file)
+        if availableThumbnail:
+            return availableThumbnail
+    # go over folders
+    for file in os.listdir(folderPath):
+        # if not folder, skip
+        if not os.path.isdir(folderPath + "/" + file):
+            continue
+        availableThumbnail = forceThumbnail(folderPath + "/" + file)
+        if availableThumbnail:
+            return availableThumbnail
+    return None
+
 def folderThumbnail(folderPath):
+    """ return thumbnail as path string of a random file in folder """
     availableThumbnail = []
     for file in os.listdir(folderPath):
-        # if not folder
+        # if file
         if not os.path.isdir(folderPath + "/" + file):
             # check if have thumbnail
             hasThumbnail = checkThumbnail(folderPath + "/" + file)
@@ -396,35 +469,44 @@ def folderThumbnail(folderPath):
     else:
         return random.choice(availableThumbnail)
 
-def loadFolderToSlider(path, sliderIndex=-1, title="untitled"):
-    frameSlider = FrameSlider(title, path=path)
-    for i, file in enumerate(os.listdir(path)):
-        if i == 20: break
+def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
+    """ create slider of all files in folder """
+    frameSlider = FrameSlider(title, path=folderPath)
+    for i, file in enumerate(os.listdir(folderPath)):
+        # images
         if file.split('.')[-1] in imagesFormats:
             f = Frame()
-            f.setSurf(path + '/' + file, name=os.path.basename(path + '/' + file))
-            f.path = path + '/' + file
+            f.setSurf(folderPath + '/' + file, name=os.path.basename(folderPath + '/' + file))
+            f.path = folderPath + '/' + file
             baseName = os.path.basename(file)
             if baseName in watched:
                 f.watched = 1
             frameSlider.addFrame(f)
+        # videos
         elif file.split('.')[-1] in videoFormats:
             f = Frame()
-            thumbnail = checkAndCreateThumbnail(path + '/' + file)
-            f.setSurf(color=(20, 9, 229), name=os.path.basename(path + '/' + file), surf=thumbnail)
-            f.path = path + '/' + file
+            thumbnail = checkAndCreateThumbnailSurf(folderPath + '/' + file)
+            f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '/' + file), surf=thumbnail)
+            f.path = folderPath + '/' + file
             baseName = os.path.basename(file)
             if baseName in watched:
                 f.watched = 1
             frameSlider.addFrame(f)
-        elif os.path.isdir(path + '/' + file):
+        # folders
+        elif os.path.isdir(folderPath + '/' + file):
             f = Frame(folder=True)
-            thumbnail = folderThumbnail(path + '/' + file)
+            thumbnail = folderThumbnail(folderPath + '/' + file)
+            if not thumbnail:
+                # this function may be stuck
+                # thumbnail = forceThumbnail(folderPath + '/' + file)
+                thumbnail = None
+                    
+
             if thumbnail:
-                f.setSurf(color=(20, 9, 229), name=os.path.basename(path + '/' + file), surf=checkAndCreateThumbnail(thumbnail))
+                f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '/' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
             else:
-                f.setSurf(color=(229, 229, 9), name=os.path.basename(path + '/' + file))
-            f.path = path + '/' + file
+                f.setSurf(color=(229, 229, 9), name=os.path.basename(folderPath + '/' + file))
+            f.path = folderPath + '/' + file
             baseName = os.path.basename(file)
             if baseName in watched:
                 f.watched = 1
