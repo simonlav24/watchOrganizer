@@ -143,6 +143,10 @@ class Gui:
     def draw(self):
         for element in self._instance.elements:
             element.draw()
+        if self.selectedFrame:
+            self.selectedFrame.draw()
+        if self.selectedFrameSlider:
+            self.selectedFrameSlider.drawArrows()
     def handleEvents(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
@@ -209,19 +213,20 @@ class FrameSlider:
             Gui().selectedFrameSlider = self
         else:
             self.selected = False
-                
+    def drawArrows(self):
+        ypos = self.pos[1] + self.titleSurf.get_height() + 5 + frameSize[1] / 2 - arrowSize[1] / 2
+        leftArrow = [tup2vec(i) + Vector(arrowSize[0], ypos) for i in arrow]
+        pygame.draw.polygon(win, (255,255,255), leftArrow)
+
+        rightArrow = [Vector(-i[0], i[1]) + Vector(win.get_width() - arrowSize[0], ypos) for i in arrow]
+        pygame.draw.polygon(win, (255,255,255), rightArrow)
     def draw(self):
         win.blit(self.titleSurf, (self.pos[0] + 10, self.pos[1]))
         win.blit(self.backSurf, (win.get_width() - self.backSurf.get_width() - 10 - 50, self.pos[1]))
         for frame in self.frames:
             frame.draw()
         if self.selected:
-            ypos = self.pos[1] + self.titleSurf.get_height() + 5 + frameSize[1] / 2 - arrowSize[1] / 2
-            leftArrow = [tup2vec(i) + Vector(arrowSize[0], ypos) for i in arrow]
-            pygame.draw.polygon(win, (255,255,255), leftArrow)
-
-            rightArrow = [Vector(-i[0], i[1]) + Vector(win.get_width() - arrowSize[0], ypos) for i in arrow]
-            pygame.draw.polygon(win, (255,255,255), rightArrow)
+            self.drawArrows()
     def slide(self, button):
         framesInWin = win.get_width() // (frameSize[0] + 8)
         slideOffset = 0
@@ -284,7 +289,7 @@ class Frame:
 
         self.watched = 0
         self.animationState = "idle"
-        self.animOffset = 0
+        self.animOffsets = [0,0]
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
@@ -340,17 +345,20 @@ class Frame:
             self.animationState = "idle"
         
         if self.animationState == "idle":
-            direction = (0 - self.animOffset)
-            self.animOffset += direction * 0.05
+            self.animOffsets[0] += (0 - self.animOffsets[0]) * 0.05
+            self.animOffsets[1] += (0 - self.animOffsets[1]) * 0.2
         if self.animationState == "hover":
-            direction = (1 - self.animOffset)
-            self.animOffset += direction * 0.1
+            self.animOffsets[0] += (1 - self.animOffsets[0]) * 0.1
+            self.animOffsets[1] += (1 - self.animOffsets[1]) * 0.1
     def draw(self):
-        if self.animOffset > 0.01:
+        if self.animOffsets[0] > 0.01 or self.animOffsets[1] > 0.01:
             surf = self.surf.copy()
-            posx =  self.animOffset * frameSize[0] - frameSize[0]
+            posx =  self.animOffsets[0] * frameSize[0] - frameSize[0]
             surf.blit(highlightSurf, (posx,0), special_flags=pygame.BLEND_RGBA_ADD)
-            win.blit(surf, self.pos)
+            scale = 1 + self.animOffsets[1] * 0.2
+            surf = pygame.transform.smoothscale(surf, (int(frameSize[0] * scale), int(frameSize[1] * scale)))
+            posOffset = (int(frameSize[0] * (1 - scale) / 2), int(frameSize[1] * (1 - scale) / 2))
+            win.blit(surf, self.pos + posOffset)
         else:
             win.blit(self.surf, self.pos)
         
