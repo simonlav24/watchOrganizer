@@ -513,7 +513,7 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
             if thumbnail:
                 f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '/' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
             else:
-                f.setSurf(color=(229, 229, 9), name=os.path.basename(folderPath + '/' + file))
+                f.setSurf(color=RED, name=os.path.basename(folderPath + '/' + file))
             f.path = folderPath + '/' + file
             baseName = os.path.basename(file)
             if baseName in watched:
