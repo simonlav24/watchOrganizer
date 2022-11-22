@@ -9,8 +9,25 @@ imagesFormats = ['png', 'jpg', 'jpeg', 'bmp']
 videoFormats = ['mp4', 'avi', 'mov', 'flv', 'wmv', 'mpg', 'mpeg', 'mkv']
 acceptableFormats = imagesFormats + videoFormats
 
+class FontStrokeDeco:
+    def __init__(self, font):
+        self.font = font
+
+    def render(self, text, antialias=False, color=(255,255,255)):
+        text_surf = self.font.render(text, antialias, color)
+        text_stroke = self.font.render(text, antialias, (0,0,0))
+        bg = pygame.Surface((text_surf.get_width() + 2, text_surf.get_height() + 2), pygame.SRCALPHA)
+        bg.blit(text_stroke, (0, 0))
+        bg.blit(text_stroke, (2, 0))
+        bg.blit(text_stroke, (0, 2))
+        bg.blit(text_stroke, (2, 2))
+        bg.blit(text_surf, (1, 1))
+        return bg
+
 titleFont = pygame.font.SysFont('Tahoma', 26, True)
-nameFont = pygame.font.SysFont('Tahoma', 16, False)
+nameFont = FontStrokeDeco(pygame.font.SysFont('Tahoma', 16, False))
+
+
 
 arrow = [(0,14), (12,0), (14,2), (4,14), (14,26), (12,28)]
 arrowSize = Vector(14, 28)
