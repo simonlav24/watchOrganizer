@@ -138,6 +138,7 @@ class Gui:
         self.animations = []
         self.selectedFrame = None
         self.selectedFrameSlider = None
+        self.animating = False
     def reposition(self):
         for i, element in enumerate(self.elements):
             element.pos = Vector(5, 100 + i * (frameSize[1] + 100))
@@ -147,8 +148,13 @@ class Gui:
     def step(self):
         for element in self.elements:
             element.step()
+        doneAnimations = []
         for animation in self.animations:
             animation.step()
+            if animation.done:
+                doneAnimations.append(animation)
+        for animation in doneAnimations:
+            self.animations.remove(animation)
         if self.selectedFrame:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
             if not self.selectedFrame.selected:
@@ -199,9 +205,15 @@ class Gui:
                         loadFolderToSlider(path, sliderIndex, os.path.basename(path))
                         # addToFrequancy(path)
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+            elif event.button == 4:
+                print(1)
+                self.selectedFrameSlider.slide("left", 1)  
+            elif event.button == 5:
+                print(2)
+                self.selectedFrameSlider.slide("right", 1)
                 
 class FrameSlider:
-    def __init__(self, title, path=''):
+    def __init__(self, title, path=''):            
         self.frames = []
         self.title = handleName(title)
         self.titleSurf = titleFont.render(self.title, True, (255,255,255))
@@ -244,13 +256,14 @@ class FrameSlider:
             frame.draw()
         if self.selected:
             self.drawArrows()
-    def slide(self, button):
-        framesInWin = win.get_width() // (frameSize[0] + 8)
+    def slide(self, button, framesAmount=0):
+        if framesAmount == 0:
+            framesAmount = win.get_width() // (frameSize[0] + 8)
         slideOffset = 0
         animate = True
         if button == 'left':
             # slide right
-            self.slideIndex -= framesInWin
+            self.slideIndex -= framesAmount
             if self.slideIndex < 0:
                 self.slideIndex = 0
                 animate = False
@@ -259,18 +272,20 @@ class FrameSlider:
 
         elif button == 'right':
             # slide left
-            self.slideIndex += framesInWin
-            if self.slideIndex > len(self.frames):# - framesInWin:
-                self.slideIndex = len(self.frames) - framesInWin
+            self.slideIndex += framesAmount
+            if self.slideIndex > len(self.frames):# - framesAmount:
+                self.slideIndex = len(self.frames) - framesAmount
                 animate = False
             else:
                 slideOffset = -1 * (frameSize[0] + 8)
 
         if animate:
-            AnimatorSlider(self, Vector(slideOffset * framesInWin, 0))
+            AnimatorSlider(self, Vector(slideOffset * framesAmount, 0))
 
 class AnimatorSlider:
     def __init__(self, slider, offset):
+        if len(Gui().animations) != 0:
+            return
         Gui().animations.append(self)
         self.slider = slider
         self.offset = offset
@@ -282,6 +297,8 @@ class AnimatorSlider:
 
         self.framesInitialValues = [vectorCopy(i.pos) for i in self.slider.frames]
         self.framesFinalValues = [i.pos + offset for i in self.slider.frames]
+        
+        self.done = False
     def ease(self, t):
         return t * t * t * (t * (t * 6 - 15) + 10)
     def step(self):
@@ -293,6 +310,7 @@ class AnimatorSlider:
         if self.t >= 1:
             for i, frame in enumerate(self.slider.frames):
                 frame.pos = self.framesFinalValues[i]
+            self.done = True
 
 class Frame:
     def __init__(self, folder=False):
