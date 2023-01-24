@@ -58,6 +58,14 @@ def addToWatched(path):
     with open("watch.ini", "a+") as file:
         file.write(baseName + "\n")
 
+def removeFromWatched(path):
+    baseName = os.path.basename(path)
+    if baseName in watched:
+        watched.remove(baseName)
+    with open("watch.ini", "w") as file:
+        for name in watched:
+            file.write(name + "\n")
+
 # def addToFrequancy(path):
 #     return
 #     baseName = os.path.basename(path)
@@ -138,6 +146,7 @@ class Gui:
         self.animations = []
         self.selectedFrame = None
         self.selectedFrameSlider = None
+        self.menu = None
     def reposition(self):
         for i, element in enumerate(self.elements):
             element.pos = Vector(5, 100 + i * (frameSize[1] + 100))
@@ -157,6 +166,8 @@ class Gui:
         if self.selectedFrameSlider:
             if not self.selectedFrameSlider.selected:
                 self.selectedFrameSlider = None
+        if self.menu:
+            self.menu.step()
     def draw(self):
         for element in self._instance.elements:
             element.draw()
@@ -164,10 +175,31 @@ class Gui:
             self.selectedFrame.draw()
         if self.selectedFrameSlider:
             self.selectedFrameSlider.drawArrows()
+        if self.menu:
+            self.menu.draw()
+    def handleMenuEvents(self, key):
+        context = self.menu.context
+        if key == 'Mark as unwatched':
+            removeFromWatched(context.path)
+            context.watched = 0
+        elif key == 'Mark Folder as unwatched':
+            print('not supported yet')
+        elif key == 'Play Random':
+            playRandom(context.path)
+        
     def handleEvents(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 mouse = event.pos
+                if self.menu:
+                    # if mouse is not on menu
+                    if mouse[0] < self.menu.pos.x or mouse[0] > self.menu.pos.x + self.menu.size[0] or mouse[1] < self.menu.pos.y or mouse[1] > self.menu.pos.y + self.menu.size[1]:
+                        self.menu = None
+                    else:
+                        key = self.menu.handleEvents(event)
+                        self.handleMenuEvents(key)
+                    self.menu = None
+                    return
                 # slide
                 if self.selectedFrameSlider:
                     if mouse[0] < 50:
@@ -199,7 +231,20 @@ class Gui:
                         loadFolderToSlider(path, sliderIndex, os.path.basename(path))
                         # addToFrequancy(path)
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-                
+            elif event.button == 3:
+                if self.selectedFrame:
+                    if not self.selectedFrame.folder:
+                        # right click on file
+                        menu = Menu(event.pos, self.selectedFrame)
+                        menu.addButton('Mark as unwatched', 'Mark as unwatched')
+                        self.menu = menu
+                    else:
+                        # right click on folder
+                        menu = Menu(event.pos, self.selectedFrame)
+                        menu.addButton('Play Random', 'Play Random')
+                        menu.addButton('Mark Folder as unwatched', 'Mark Folder as unwatched')
+                        self.menu = menu
+
 class FrameSlider:
     def __init__(self, title, path=''):
         self.frames = []
@@ -386,6 +431,65 @@ class Frame:
             pygame.draw.line(win, RED, start, start + (end - start) * self.watched, 3)
         # pygame.draw.circle(win, (255,255,255), (int(self.pos[0] + frameSize[0]/2), int(self.pos[1] + frameSize[1]/2)), int(self.animOffset * frameSize[0]/2), 0)
 
+class Menu:
+    def __init__(self, pos, context):
+        self.pos = tup2vec(pos)
+        self.size = Vector()
+        self.elements = []
+        self.context = context
+    def addButton(self, key, text):
+        button = MenuButton(text, key)
+        self.elements.append(button)
+        self.recalculate()
+    def recalculate(self):
+        self.size = Vector()
+        for element in self.elements:
+            element.pos = self.pos + Vector(0, self.size[1])
+            self.size[0] = max(self.size[0], element.size[0])
+            self.size[1] += element.size[1]
+        for i, element in enumerate(self.elements):
+            element.size[0] = self.size[0]
+            element.pos = self.pos + Vector(0, i * element.size[1])
+    def handleEvents(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                for element in self.elements:
+                    if element.selected:
+                        return element.key
+    def step(self):
+        for element in self.elements:
+            element.step()
+    def draw(self):
+        pygame.draw.rect(win, (0,0,0), (self.pos, self.size))
+        for element in self.elements:
+            element.draw()
+
+class MenuButton:
+    def __init__(self, text, key):
+        self.key = key
+        self.text = text
+
+        self.pos = Vector()
+        self.size = Vector()
+
+        self.selected = False
+        self.setTextSurf()
+
+    def setTextSurf(self):
+        self.textSurf = nameFont.render(self.text, True, (255,255,255))
+        self.size = Vector(self.textSurf.get_width() + 20, self.textSurf.get_height() + 20)
+    def draw(self):
+        if self.selected:
+            pygame.draw.rect(win, (255,255,255), (self.pos, self.size))
+        win.blit(self.textSurf, (self.pos[0] + 10 , self.pos[1] + self.size[1]/2 - self.textSurf.get_height()/2))
+    def step(self):
+        mouse = pygame.mouse.get_pos()
+        if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + self.size[0]\
+                and mouse[1] > self.pos[1] and mouse[1] <= self.pos[1] + self.size[1]:
+            self.selected = True
+        else:
+            self.selected = False
+
 def createThumbnail(filePath):
     """ returns thumbnail Surface from path file """
     importedVideo = cv2.VideoCapture(filePath)
@@ -541,6 +645,23 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
     else:
         Gui().elements.insert(sliderIndex, frameSlider)
     Gui().reposition()
+
+def findPlayableFiles(folder):
+    # return all playable files in folder recursively
+    playableFiles = []
+    for file in os.listdir(folder):
+        if isAcceptableFormat(file):
+            playableFiles.append(folder + '/' + file)
+        if os.path.isdir(folder + '/' + file):
+            playableFiles += findPlayableFiles(folder + '/' + file)
+    return playableFiles
+
+def playRandom(folder):
+    playable = findPlayableFiles(folder)
+    if len(playable) == 0:
+        return
+    path = random.choice(playable)
+    execute(path)
 
 def init():
     for folder in folderDict:
