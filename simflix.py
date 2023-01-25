@@ -588,34 +588,37 @@ def calculateFolderWatched(folderPath):
         return 0
     return watchedPercentage / len(playable)
 
+def addFrame(filePath):
+    """ add image frame to slider """
+    f = Frame()
+    if os.path.splitext(filePath)[1].replace('.', '') in imagesFormats:
+        f.setSurf(filePath, name=os.path.basename(filePath))
+    elif os.path.splitext(filePath)[1].replace('.', '') in videoFormats:
+        thumbnail = checkAndCreateThumbnailSurf(filePath)
+        f.setSurf(color=(20, 9, 229), name=os.path.basename(filePath), surf=thumbnail)
+    f.path = filePath
+    baseName = os.path.basename(filePath)
+    if baseName in watched:
+        f.watched = 1
+    return f
+
 def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
     """ create slider of all files in folder """
     global watched
     frameSlider = FrameSlider(title, path=folderPath)
     for i, file in enumerate(os.listdir(folderPath)):
-        # images
-        if file.split('.')[-1] in imagesFormats:
-            f = Frame()
-            f.setSurf(folderPath + '/' + file, name=os.path.basename(folderPath + '/' + file))
-            f.path = folderPath + '/' + file
-            baseName = os.path.basename(file)
-            if baseName in watched:
-                f.watched = 1
-            frameSlider.addFrame(f)
-        # videos
-        elif file.split('.')[-1] in videoFormats:
-            f = Frame()
-            thumbnail = checkAndCreateThumbnailSurf(folderPath + '/' + file)
-            f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '/' + file), surf=thumbnail)
-            f.path = folderPath + '/' + file
-            baseName = os.path.basename(file)
-            if baseName in watched:
-                f.watched = 1
-            frameSlider.addFrame(f)
-        # folders
-        elif os.path.isdir(folderPath + '/' + file):
-            if len(findPlayableFiles(folderPath + '/' + file)) == 0:
+        if os.path.isdir(folderPath + '/' + file):
+            # folder
+            playables = findPlayableFiles(folderPath + '/' + file)
+            if len(playables) == 0:
+                # no playable files in folder
                 continue
+            elif len(playables) == 1:
+                # only one playable file in folder, add it to slider
+                f = addFrame(playables[0])
+                frameSlider.addFrame(f)
+                continue
+
             f = Frame(folder=True)
             thumbnail = folderThumbnail(folderPath + '/' + file)
 
@@ -629,6 +632,11 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
             watchedPercentage = calculateFolderWatched(folderPath + '/' + file)
             f.watched = watchedPercentage
             frameSlider.addFrame(f)
+        elif isAcceptableFormat(file):
+            # files
+            f = addFrame(folderPath + '/' + file)
+            frameSlider.addFrame(f)
+    
     if sliderIndex == -1:
         Gui().elements.append(frameSlider)
     else:
