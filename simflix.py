@@ -27,8 +27,6 @@ class FontStrokeDeco:
 titleFont = pygame.font.SysFont('Tahoma', 26, True)
 nameFont = FontStrokeDeco(pygame.font.SysFont('Tahoma', 16, False))
 
-
-
 arrow = [(0,14), (12,0), (14,2), (4,14), (14,26), (12,28)]
 arrowSize = Vector(14, 28)
 
@@ -78,7 +76,11 @@ if os.path.exists("folders.ini"):
         line = file.readline()
         folderDict = ast.literal_eval(line)
 
-win = pygame.display.set_mode((1440, 720), pygame.RESIZABLE)
+# screenSize = ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1)
+# print(screenSize)
+screenInfo = pygame.display.Info()
+screenSize = (screenInfo.current_w - 10, screenInfo.current_h - 70)
+win = pygame.display.set_mode(screenSize, pygame.RESIZABLE)
 clock = pygame.time.Clock()
 fps = 60
 pygame.display.set_caption('Simflix')
