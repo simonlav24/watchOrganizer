@@ -571,7 +571,7 @@ def folderThumbnail(folderPath):
         return None
     elif len(thumbnails) == 0:
         # create thumbnail for the first file
-        checkAndCreateThumbnailPath(playable[0])
+        return checkAndCreateThumbnailPath(playable[0])
     else:
         return random.choice(thumbnails)
 
@@ -616,8 +616,6 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
                 continue
             f = Frame(folder=True)
             thumbnail = folderThumbnail(folderPath + '/' + file)
-            if not thumbnail:
-                thumbnail = None
 
             if thumbnail:
                 f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '/' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
