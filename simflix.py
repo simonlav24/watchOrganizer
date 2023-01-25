@@ -76,8 +76,6 @@ if os.path.exists("folders.ini"):
         line = file.readline()
         folderDict = ast.literal_eval(line)
 
-# screenSize = ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1)
-# print(screenSize)
 screenInfo = pygame.display.Info()
 screenSize = (screenInfo.current_w - 10, screenInfo.current_h - 70)
 win = pygame.display.set_mode(screenSize, pygame.RESIZABLE)
@@ -185,7 +183,8 @@ class Gui:
             context.watched = 0
         elif key == 'Play Random':
             playRandom(context.path)
-        
+        elif key == 'Open in explorer':
+            openInExplorer(context.path)
     def handleEvents(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
@@ -241,12 +240,14 @@ class Gui:
                             menu.addButton('Mark as unwatched', 'Mark as unwatched')
                         else:
                             menu.addButton('Mark as watched', 'Mark as watched')
+                        menu.addButton('Open in explorer', 'Open in explorer')
                         self.menu = menu
                     else:
                         # right click on folder
                         menu = Menu(event.pos, self.selectedFrame)
                         menu.addButton('Play Random', 'Play Random')
                         menu.addButton('Mark Folder as unwatched', 'Mark Folder as unwatched')
+                        menu.addButton('Open in explorer', 'Open in explorer')
                         self.menu = menu
 
 class FrameSlider:
@@ -659,6 +660,12 @@ def playRandom(folder):
         return
     path = random.choice(playable)
     execute(path)
+
+def openInExplorer(path):
+    """ open folder in explorer """
+    if os.path.isfile(path):
+        path = os.path.dirname(path)
+    os.startfile(path)
 
 def init():
     for folder in folderDict:
