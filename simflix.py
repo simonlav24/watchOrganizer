@@ -47,9 +47,10 @@ def isAcceptableFormat(fileName):
 
 def loadWatched(watched):
     if os.path.exists("watch.ini"):
-	    with open("watch.ini", "r") as file:
-		    for line in file.readlines():
-			    watched.append(line[:-1])
+        with open("watch.ini", "r") as file:
+            for line in file.readlines():
+                if line[:-1] not in watched:
+                    watched.append(line[:-1])
 
 def addToWatched(path):
     baseName = os.path.basename(path)
@@ -59,22 +60,20 @@ def addToWatched(path):
         file.write(baseName + "\n")
 
 def removeFromWatched(path):
+    # folder
+    if os.path.isdir(path):
+        playable = findPlayableFiles(path)
+        for file in playable:
+            removeFromWatched(file)
+        return
+
+    # file
     baseName = os.path.basename(path)
     if baseName in watched:
         watched.remove(baseName)
-    with open("watch.ini", "w") as file:
-        for name in watched:
-            file.write(name + "\n")
-
-# def addToFrequancy(path):
-#     return
-#     baseName = os.path.basename(path)
-#     if baseName not in frequancy:
-#         frequancy[baseName] = 1
-#     else:
-#         frequancy[baseName] += 1
-#     with open("frequancy.ini", "a+") as file:
-#         file.write(baseName + " = " + str(frequancy[baseName]) + "\n")
+        with open("watch.ini", "w") as file:
+            for name in watched:
+                file.write(name + "\n")
 
 watched = []
 loadWatched(watched)
@@ -183,7 +182,8 @@ class Gui:
             removeFromWatched(context.path)
             context.watched = 0
         elif key == 'Mark Folder as unwatched':
-            print('not supported yet')
+            removeFromWatched(context.path)
+            context.watched = 0
         elif key == 'Play Random':
             playRandom(context.path)
         
@@ -424,12 +424,13 @@ class Frame:
         else:
             win.blit(self.surf, self.pos)
         
-        if self.watched != 0:
+        if self.watched != 0: 
             start = self.pos + Vector(frameSize[0]/2 - 80, frameSize[1] + 10)
+            start.y += self.animOffsets[0] * 15
             end = self.pos + Vector(frameSize[0]/2 + 80, frameSize[1] + 10)
+            end.y += self.animOffsets[0] * 15
             pygame.draw.line(win, (91,91,91), start, end, 3)
             pygame.draw.line(win, RED, start, start + (end - start) * self.watched, 3)
-        # pygame.draw.circle(win, (255,255,255), (int(self.pos[0] + frameSize[0]/2), int(self.pos[1] + frameSize[1]/2)), int(self.animOffset * frameSize[0]/2), 0)
 
 class Menu:
     def __init__(self, pos, context):
@@ -598,8 +599,20 @@ def folderThumbnail(folderPath):
     else:
         return random.choice(availableThumbnail)
 
+def calculateFolderWatched(folderPath):
+    """go over all files recursively and calculate watched percentage"""
+    playable = findPlayableFiles(folderPath)
+    watchedPercentage = 0
+    for file in playable:
+        if os.path.basename(file) in watched:
+            watchedPercentage += 1
+    if len(playable) == 0:
+        return 0
+    return watchedPercentage / len(playable)
+
 def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
     """ create slider of all files in folder """
+    global watched
     frameSlider = FrameSlider(title, path=folderPath)
     for i, file in enumerate(os.listdir(folderPath)):
         # images
@@ -629,7 +642,6 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
                 # this function may be stuck
                 # thumbnail = forceThumbnail(folderPath + '/' + file)
                 thumbnail = None
-                    
 
             if thumbnail:
                 f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '/' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
@@ -637,8 +649,9 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
                 f.setSurf(color=RED, name=os.path.basename(folderPath + '/' + file))
             f.path = folderPath + '/' + file
             baseName = os.path.basename(file)
-            if baseName in watched:
-                f.watched = 1
+            # configure watched amount
+            watchedPercentage = calculateFolderWatched(folderPath + '/' + file)
+            f.watched = watchedPercentage
             frameSlider.addFrame(f)
     if sliderIndex == -1:
         Gui().elements.append(frameSlider)
@@ -647,7 +660,7 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
     Gui().reposition()
 
 def findPlayableFiles(folder):
-    # return all playable files in folder recursively
+    """ return all playable files in folder recursively """
     playableFiles = []
     for file in os.listdir(folder):
         if isAcceptableFormat(file):
