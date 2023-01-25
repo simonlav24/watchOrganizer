@@ -36,12 +36,6 @@ RED = (229,9,20)
 
 watched = []
 
-# frequancy = {}
-# if os.path.exists("frequancy.ini"):
-#     with open("frequancy.ini", "r") as file:
-#         for line in file.readlines():
-#             frequancy[line[:-1]] = ast.literal_eval(line[:-1])
-
 def isAcceptableFormat(fileName):
     return fileName.split('.')[-1] in acceptableFormats
 
@@ -501,6 +495,10 @@ class MenuButton:
 
 def createThumbnail(filePath):
     """ returns thumbnail Surface from path file """
+    file_extension = os.path.splitext(filePath)[1]
+    if file_extension.replace('.', '') in imagesFormats:
+        frame = pygame.image.load(filePath)
+        return frame
     importedVideo = cv2.VideoCapture(filePath)
     width = int(importedVideo.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(importedVideo.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -562,50 +560,20 @@ def checkThumbnail(filePath):
     else:
         return True
 
-def forceThumbnail(folderPath):
-    """ find the first file in the folder that can be thumbnailed and create a thumbnail for it and return as path string"""
-    availableThumbnail = None
-    # go over files
-    for file in os.listdir(folderPath):
-        if not isAcceptableFormat(file):
-            continue
-
-        # if folder, skip
-        if os.path.isdir(folderPath + "/" + file):
-            continue
-
-        availableThumbnail = checkAndCreateThumbnailPath(folderPath + "/" + file)
-        if availableThumbnail:
-            return availableThumbnail
-    # go over folders
-    for file in os.listdir(folderPath):
-        # if not folder, skip
-        if not os.path.isdir(folderPath + "/" + file):
-            continue
-        availableThumbnail = forceThumbnail(folderPath + "/" + file)
-        if availableThumbnail:
-            return availableThumbnail
-    return None
-
 def folderThumbnail(folderPath):
     """ return thumbnail as path string of a random file in folder """
-    availableThumbnail = []
-    for file in os.listdir(folderPath):
-        # if file
-        if not os.path.isdir(folderPath + "/" + file):
-            # check if have thumbnail
-            hasThumbnail = checkThumbnail(folderPath + "/" + file)
-            if hasThumbnail:
-                availableThumbnail.append(folderPath + "/" + file)
-        # if folder
-        else:
-            thumbnail = folderThumbnail(folderPath + "/" + file)
-            if thumbnail:
-                availableThumbnail.append(thumbnail)
-    if len(availableThumbnail) == 0:
+    thumbnails = []
+    playable = findPlayableFiles(folderPath)
+    for file in playable:
+        if checkThumbnail(file):
+            thumbnails.append(file)
+    if len(thumbnails) == 0 and len(playable) == 0:
         return None
+    elif len(thumbnails) == 0:
+        # create thumbnail for the first file
+        checkAndCreateThumbnailPath(playable[0])
     else:
-        return random.choice(availableThumbnail)
+        return random.choice(thumbnails)
 
 def calculateFolderWatched(folderPath):
     """go over all files recursively and calculate watched percentage"""
@@ -644,11 +612,11 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
             frameSlider.addFrame(f)
         # folders
         elif os.path.isdir(folderPath + '/' + file):
+            if len(findPlayableFiles(folderPath + '/' + file)) == 0:
+                continue
             f = Frame(folder=True)
             thumbnail = folderThumbnail(folderPath + '/' + file)
             if not thumbnail:
-                # this function may be stuck
-                # thumbnail = forceThumbnail(folderPath + '/' + file)
                 thumbnail = None
 
             if thumbnail:
