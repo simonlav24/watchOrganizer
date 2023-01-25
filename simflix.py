@@ -181,6 +181,9 @@ class Gui:
         if key == 'Mark as unwatched':
             removeFromWatched(context.path)
             context.watched = 0
+        elif key == 'Mark as watched':
+            addToWatched(context.path)
+            context.watched = 1
         elif key == 'Mark Folder as unwatched':
             removeFromWatched(context.path)
             context.watched = 0
@@ -202,13 +205,14 @@ class Gui:
                     return
                 # slide
                 if self.selectedFrameSlider:
+                    # left or right
                     if mouse[0] < 50:
                         self.selectedFrameSlider.slide("left")    
                         return
                     elif mouse[0] > win.get_width() - 50:
                         self.selectedFrameSlider.slide("right")
                         return
-                    
+                    # back
                     if mouse[0] > win.get_width() - self.selectedFrameSlider.backSurf.get_width() - 50 - 10 and mouse[1] > self.selectedFrameSlider.pos.y and mouse[1] < self.selectedFrameSlider.pos.y + self.selectedFrameSlider.backSurf.get_height():
                         path = os.path.dirname(self.selectedFrameSlider.path)
                         sliderIndex = self.elements.index(self.selectedFrameSlider)
@@ -229,14 +233,18 @@ class Gui:
                         sliderIndex = self.elements.index(self.selectedFrameSlider)
                         self.elements.remove(self.selectedFrameSlider)
                         loadFolderToSlider(path, sliderIndex, os.path.basename(path))
-                        # addToFrequancy(path)
+                        self.selectedFrame = None
+                        
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             elif event.button == 3:
                 if self.selectedFrame:
                     if not self.selectedFrame.folder:
                         # right click on file
                         menu = Menu(event.pos, self.selectedFrame)
-                        menu.addButton('Mark as unwatched', 'Mark as unwatched')
+                        if self.selectedFrame.watched == 1:
+                            menu.addButton('Mark as unwatched', 'Mark as unwatched')
+                        else:
+                            menu.addButton('Mark as watched', 'Mark as watched')
                         self.menu = menu
                     else:
                         # right click on folder
