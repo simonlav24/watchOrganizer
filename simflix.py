@@ -67,14 +67,26 @@ def removeFromWatched(path):
             for name in watched:
                 file.write(name + "\n")
 
+def loadFolderDict():
+    folderDict = {}
+    if os.path.exists("folders.ini"):
+        with open("folders.ini", "r") as file:
+            line = file.readline()
+            folderDict = ast.literal_eval(line)
+    return folderDict
+
+def saveFolderDict(folderDict):
+    with open("folders.ini", "w") as file:
+        file.write(str(folderDict))
+
+def addToFolderDict(key, path):
+    folderDict[key] = path
+    saveFolderDict(folderDict)
+
 watched = []
 loadWatched(watched)
 
-folderDict = {}
-if os.path.exists("folders.ini"):
-    with open("folders.ini", "r") as file:
-        line = file.readline()
-        folderDict = ast.literal_eval(line)
+folderDict = loadFolderDict()
 
 screenInfo = pygame.display.Info()
 screenSize = (screenInfo.current_w - 10, screenInfo.current_h - 70)
@@ -185,6 +197,13 @@ class Gui:
             playRandom(context.path)
         elif key == 'Open in explorer':
             openInExplorer(context.path)
+        elif key == 'Create Slider':
+            path = context.path
+            name = os.path.basename(path)
+            loadFolderToSlider(path, title=name)
+            folderDict[name] = path
+            saveFolderDict(folderDict)
+
     def handleEvents(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
@@ -248,7 +267,23 @@ class Gui:
                         menu.addButton('Play Random', 'Play Random')
                         menu.addButton('Mark Folder as unwatched', 'Mark Folder as unwatched')
                         menu.addButton('Open in explorer', 'Open in explorer')
+                        menu.addButton('Create Slider', 'Create Slider')
                         self.menu = menu
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_DELETE:
+                if self.selectedFrameSlider:
+                    # remove the frame slider
+                    self.elements.remove(self.selectedFrameSlider)
+                    value = self.selectedFrameSlider.path
+                    for key, val in folderDict.items():
+                        if val == value:
+                            del folderDict[key]
+                            break
+                    self.selectedFrame = None
+                    self.selectedFrameSlider = None
+                    saveFolderDict(folderDict)
+
+
 
 class FrameSlider:
     def __init__(self, title, path=''):
