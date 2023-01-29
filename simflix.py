@@ -100,13 +100,12 @@ folderIconSurf = pygame.image.load('./assets/folderIcon.png').convert_alpha()
 folderIconSurf = pygame.transform.smoothscale(folderIconSurf, (folderIconSurf.get_width()*0.06, folderIconSurf.get_height()*0.06))
 
 highlightSurf = pygame.Surface((frameSize[0], frameSize[1]), pygame.SRCALPHA)
-pygame.draw.polygon(highlightSurf, (70,70,70), [(frameSize[0] * 0.6, 0), (frameSize[0] * 0.9, 0), (frameSize[0] * 0.9 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.6 - 0.3 * frameSize[0], frameSize[1])])
-pygame.draw.polygon(highlightSurf, (70,70,70), [(frameSize[0] * 0.45, 0), (frameSize[0] * 0.5, 0), (frameSize[0] * 0.5 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.45 - 0.3 * frameSize[0], frameSize[1])])
+pygame.draw.polygon(highlightSurf, (35,35,35), [(frameSize[0] * 0.6, 0), (frameSize[0] * 0.9, 0), (frameSize[0] * 0.9 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.6 - 0.3 * frameSize[0], frameSize[1])])
+pygame.draw.polygon(highlightSurf, (35,35,35), [(frameSize[0] * 0.45, 0), (frameSize[0] * 0.5, 0), (frameSize[0] * 0.5 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.45 - 0.3 * frameSize[0], frameSize[1])])
 def execute(path):
     command = '"' + path + '"'
     print("executing:", command)
     subprocess.Popen(command, shell=True)
-    # os.system(command)
 
 def handleName(name):
     nameBu = name
@@ -260,6 +259,7 @@ class Gui:
                         else:
                             menu.addButton('Mark as watched', 'Mark as watched')
                         menu.addButton('Open in explorer', 'Open in explorer')
+                        menu.finalize()
                         self.menu = menu
                     else:
                         # right click on folder
@@ -268,6 +268,7 @@ class Gui:
                         menu.addButton('Mark Folder as unwatched', 'Mark Folder as unwatched')
                         menu.addButton('Open in explorer', 'Open in explorer')
                         menu.addButton('Create Slider', 'Create Slider')
+                        menu.finalize()
                         self.menu = menu
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_DELETE:
@@ -282,8 +283,6 @@ class Gui:
                     self.selectedFrame = None
                     self.selectedFrameSlider = None
                     saveFolderDict(folderDict)
-
-
 
 class FrameSlider:
     def __init__(self, title, path=''):
@@ -482,6 +481,17 @@ class Menu:
         button = MenuButton(text, key)
         self.elements.append(button)
         self.recalculate()
+    def finalize(self):
+        # if menu is out of screen to the right, move it to the left
+        if self.pos[0] + self.size[0] > win.get_width():
+            self.pos[0] = self.pos[0] - self.size[0]
+            for element in self.elements:
+                element.pos[0] -= self.size[0]
+        # if menu is out of screen to the bottom, move it to the top
+        if self.pos[1] + self.size[1] > win.get_height():
+            self.pos[1] = self.pos[1] - self.size[1]
+            for element in self.elements:
+                element.pos[1] -= self.size[1]
     def recalculate(self):
         self.size = Vector()
         for element in self.elements:
@@ -575,7 +585,11 @@ def checkAndCreateThumbnailSurf(filePath):
         if not thumbnail:
             return None
         if thumbnail.get_width() > thumbnail.get_height():
-            thumbnail = pygame.transform.smoothscale(thumbnail, (frameSize[0], frameSize[0] * thumbnail.get_height() // thumbnail.get_width()))
+            new_size = (frameSize[0], frameSize[0] * thumbnail.get_height() // thumbnail.get_width())
+            try:
+                thumbnail = pygame.transform.smoothscale(thumbnail, new_size)
+            except ValueError:
+                thumbnail = pygame.transform.scale(thumbnail, new_size)
         else:
             thumbnail = pygame.transform.smoothscale(thumbnail, (frameSize[1] * thumbnail.get_width() // thumbnail.get_height(), frameSize[1]))
         pygame.image.save(thumbnail, thumbnailPath)
