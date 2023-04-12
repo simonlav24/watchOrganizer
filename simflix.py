@@ -1,5 +1,6 @@
 import pygame, os, ast, random, cv2, re, subprocess
 from vector import *
+from timeit import default_timer as timer
 pygame.init()
 
 bgColor = (20,20,20)
@@ -73,6 +74,10 @@ def loadFolderDict():
         with open("folders.ini", "r") as file:
             line = file.readline()
             folderDict = ast.literal_eval(line)
+    else:
+        with open("folders.ini", "w+") as file:
+            example_dict = {'Title': 'path'}
+            file.write(str(example_dict))
     return folderDict
 
 def saveFolderDict(folderDict):
@@ -151,6 +156,9 @@ class Gui:
         self.selectedFrame = None
         self.selectedFrameSlider = None
         self.menu = None
+
+        self.stable = False
+        AnimatorInit()
     def reposition(self):
         for i, element in enumerate(self.elements):
             element.pos = Vector(5, 100 + i * (frameSize[1] + 100))
@@ -158,10 +166,22 @@ class Gui:
     def select(self, frame):
         self.selectedFrame = frame
     def step(self):
+        self.stable = True
+        # step for elements
         for element in self.elements:
             element.step()
+            if not element.stable:
+                self.stable = False
+        # step for animations
+        finishedAnimations = []
         for animation in self.animations:
             animation.step()
+            self.stable = False
+            if animation.finished:
+                finishedAnimations.append(animation)
+        for animation in finishedAnimations:
+            self.animations.remove(animation)
+        # step for selected frame
         if self.selectedFrame:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
             if not self.selectedFrame.selected:
@@ -170,6 +190,7 @@ class Gui:
         if self.selectedFrameSlider:
             if not self.selectedFrameSlider.selected:
                 self.selectedFrameSlider = None
+        # step for menu
         if self.menu:
             self.menu.step()
     def draw(self):
@@ -283,8 +304,13 @@ class Gui:
                     self.selectedFrame = None
                     self.selectedFrameSlider = None
                     saveFolderDict(folderDict)
+    def distable(self):
+        self.stable = False
 
 class FrameSlider:
+    """
+    A slider that contains frames
+    """
     def __init__(self, title, path=''):
         self.frames = []
         self.title = handleName(title)
@@ -294,6 +320,7 @@ class FrameSlider:
         self.slideIndex = 0
         self.selected = False
         self.path = path
+        self.stable = False
 
     def addFrame(self, frame):
         frame.parent = self
@@ -306,8 +333,11 @@ class FrameSlider:
             frame.setPos(Vector(i * (8 + frameSize[0]), 5 + self.titleSurf.get_height()))
 
     def step(self):
+        self.stable = True
         for frame in self.frames:
             frame.step()
+            if not frame.stable:
+                self.stable = False
         mouse = pygame.mouse.get_pos()
         if mouse[1] > self.pos[1] and mouse[1] < self.pos[1] + self.titleSurf.get_height() + 5 + frameSize[1]:
             self.selected = True
@@ -353,7 +383,21 @@ class FrameSlider:
         if animate:
             AnimatorSlider(self, Vector(slideOffset * framesInWin, 0))
 
+class AnimatorInit:
+    def __init__(self):
+        Gui().animations.append(self)
+        self.stable = False
+        self.finished = False
+    def step(self):
+        self.stable = True
+        self.finished = True
+    def draw(self):
+        pass
+
 class AnimatorSlider:
+    """
+        Animates a slider to move
+    """
     def __init__(self, slider, offset):
         Gui().animations.append(self)
         self.slider = slider
@@ -366,6 +410,7 @@ class AnimatorSlider:
 
         self.framesInitialValues = [vectorCopy(i.pos) for i in self.slider.frames]
         self.framesFinalValues = [i.pos + offset for i in self.slider.frames]
+        self.finished = False
     def ease(self, t):
         return t * t * t * (t * (t * 6 - 15) + 10)
     def step(self):
@@ -377,8 +422,12 @@ class AnimatorSlider:
         if self.t >= 1:
             for i, frame in enumerate(self.slider.frames):
                 frame.pos = self.framesFinalValues[i]
+            self.finished = True
 
 class Frame:
+    """
+        A frame is a single icon with an image that can be selected and clicked
+    """
     def __init__(self, folder=False):
         self.pos = Vector(0,0)
 
@@ -391,6 +440,7 @@ class Frame:
         self.watched = 0
         self.animationState = "idle"
         self.animOffsets = [0,0]
+        self.stable = False
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
@@ -451,10 +501,15 @@ class Frame:
         if self.animationState == "hover":
             self.animOffsets[0] += (1 - self.animOffsets[0]) * 0.1
             self.animOffsets[1] += (1 - self.animOffsets[1]) * 0.1
+
+        if self.animOffsets[0] < 0.001 or self.animOffsets[1] < 0.001:
+            self.stable = True
+        else:
+            self.stable = False
     def draw(self):
-        if self.animOffsets[0] > 0.01 or self.animOffsets[1] > 0.01:
+        if not self.stable:
             surf = self.surf.copy()
-            posx =  self.animOffsets[0] * frameSize[0] - frameSize[0]
+            posx =  self.animOffsets[0] * frameSize[0] - frameSize[0] - 35
             surf.blit(highlightSurf, (posx,0), special_flags=pygame.BLEND_RGBA_ADD)
             scale = 1 + self.animOffsets[1] * 0.2
             surf = pygame.transform.smoothscale(surf, (int(frameSize[0] * scale), int(frameSize[1] * scale)))
@@ -721,30 +776,34 @@ def init():
         path = folderDict[folder]
         loadFolderToSlider(path, title=folder)
 
-gui = Gui()
+Gui()
 init()
 
 done = False
 while not done:
     for event in pygame.event.get():
-        gui.handleEvents(event)
+        Gui().handleEvents(event)
         if event.type == pygame.QUIT:
             done = True
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
-                gui.selectedFrameSlider.slide('left')
+                Gui().selectedFrameSlider.slide('left')
             elif event.key == pygame.K_RIGHT:
-                gui.selectedFrameSlider.slide('right')
+                Gui().selectedFrameSlider.slide('right')
     keys = pygame.key.get_pressed()
     if keys[pygame.K_ESCAPE]:
         done = True
 
-    gui.step()
+    # step
+    Gui().step()
 
-    win.fill(bgColor)
-    win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
-    gui.draw()
+    # draw
+    if not Gui().stable:
+        win.fill(bgColor)
+        win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
+        Gui().draw()
 
-    pygame.display.update()
-    clock.tick(fps)
+        pygame.display.update()
+        clock.tick(fps)
+    
 pygame.quit()
