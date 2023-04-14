@@ -33,17 +33,33 @@ arrowSize = Vector(14, 28)
 
 RED = (229,9,20)
 
-watched = []
-
 def isAcceptableFormat(fileName):
     return fileName.split('.')[-1] in acceptableFormats
 
-def loadWatched(watched):
+def loadWatched():
+    watched = []
     if os.path.exists("watch.ini"):
         with open("watch.ini", "r") as file:
             for line in file.readlines():
                 if line[:-1] not in watched:
                     watched.append(line[:-1])
+    return watched
+
+def loadFrequencies():
+    frequencies = {}
+    if os.path.exists("frequencies.ini"):
+        with open("frequencies.ini", "r") as file:
+            line = file.readline()
+            frequencies = ast.literal_eval(line)
+    else:
+        with open("frequencies.ini", "w+") as file:
+            file.write("")
+    return frequencies
+
+def saveFrequencies():
+    global frequencies
+    with open("frequencies.ini", "w+") as file:
+        file.write(str(frequencies))
 
 def addToWatched(path):
     baseName = os.path.basename(path)
@@ -88,8 +104,20 @@ def addToFolderDict(key, path):
     folderDict[key] = path
     saveFolderDict(folderDict)
 
-watched = []
-loadWatched(watched)
+def getFrequency(path):
+    global frequencies
+    if path in frequencies:
+        return frequencies[path]
+    else:
+        return 0
+    
+def setFrequency(path, freq):
+    global frequencies
+    frequencies[path] = freq
+    saveFrequencies()
+
+watched = loadWatched()
+frequencies = loadFrequencies()
 
 folderDict = loadFolderDict()
 
@@ -260,6 +288,9 @@ class Gui:
                         path = self.selectedFrame.path
                         execute(path)
                         addToWatched(path)
+                        freq = self.selectedFrame.getFrequency()
+                        freq += 1
+                        setFrequency(path, freq)
                         self.selectedFrame.watched = 1
                     else:
                         # open folder
@@ -483,7 +514,9 @@ class Frame:
         borderMask.fill((255,255,255,255))
         pygame.draw.rect(borderMask, (0,0,0,0), ((0,0), frameSize), 0, 4)
         self.surf.blit(borderMask, (0,0), special_flags=pygame.BLEND_RGBA_SUB)
-
+    def getFrequency(self):
+        global frequencies
+        return getFrequency(self.path)
     def step(self):
         mouse = pygame.mouse.get_pos()
         if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + frameSize[0]\
@@ -712,9 +745,9 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
     global watched
     frameSlider = FrameSlider(title, path=folderPath)
     for i, file in enumerate(os.listdir(folderPath)):
-        if os.path.isdir(folderPath + '/' + file):
+        if os.path.isdir(folderPath + '\\' + file):
             # folder
-            playables = findPlayableFiles(folderPath + '/' + file)
+            playables = findPlayableFiles(folderPath + '\\' + file)
             if len(playables) == 0:
                 # no playable files in folder
                 continue
@@ -725,23 +758,25 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
                 continue
 
             f = Frame(folder=True)
-            thumbnail = folderThumbnail(folderPath + '/' + file)
+            thumbnail = folderThumbnail(folderPath + '\\' + file)
 
             if thumbnail:
-                f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '/' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
+                f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '\\' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
             else:
-                f.setSurf(color=RED, name=os.path.basename(folderPath + '/' + file))
-            f.path = folderPath + '/' + file
-            baseName = os.path.basename(file)
+                f.setSurf(color=RED, name=os.path.basename(folderPath + '\\' + file))
+            f.path = folderPath + '\\' + file
             # configure watched amount
-            watchedPercentage = calculateFolderWatched(folderPath + '/' + file)
+            watchedPercentage = calculateFolderWatched(folderPath + '\\' + file)
             f.watched = watchedPercentage
             frameSlider.addFrame(f)
         elif isAcceptableFormat(file):
             # files
-            f = addFrame(folderPath + '/' + file)
+            f = addFrame(folderPath + '\\' + file)
             frameSlider.addFrame(f)
     
+    # sort frames by (frequency, name)
+    frameSlider.frames.sort(key=lambda x: (-x.getFrequency(), x.path))
+
     if sliderIndex == -1:
         Gui().elements.append(frameSlider)
     else:
@@ -753,9 +788,9 @@ def findPlayableFiles(folder):
     playableFiles = []
     for file in os.listdir(folder):
         if isAcceptableFormat(file):
-            playableFiles.append(folder + '/' + file)
-        if os.path.isdir(folder + '/' + file):
-            playableFiles += findPlayableFiles(folder + '/' + file)
+            playableFiles.append(folder + '\\' + file)
+        if os.path.isdir(folder + '\\' + file):
+            playableFiles += findPlayableFiles(folder + '\\' + file)
     return playableFiles
 
 def playRandom(folder):
