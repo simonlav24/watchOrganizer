@@ -1,6 +1,8 @@
 import pygame, os, ast, random, cv2, re, subprocess
 from vector import *
 from timeit import default_timer as timer
+import tkinter
+from tkinter import filedialog
 pygame.init()
 
 bgColor = (20,20,20)
@@ -115,6 +117,20 @@ def setFrequency(path, freq):
     global frequencies
     frequencies[path] = freq
     saveFrequencies()
+
+def customArtwork(path):
+    file = tkinter.filedialog.askopenfile(mode ='r', filetypes =[('Image files', '*.png *.jpg *.jpeg *.bmp')])
+    if file is not None: 
+        save_path = os.path.join(".\\assets\\thumbnails", os.path.basename(path))
+        image = pygame.image.load(file.name).convert()
+        # scale image to thumbnail size
+        if image.get_width() > image.get_height():
+            image = pygame.transform.smoothscale(image, (frameSize[0], int(frameSize[0] * image.get_height() / image.get_width())))
+        else:
+            image = pygame.transform.smoothscale(image, (int(frameSize[1] * image.get_width() / image.get_height()), frameSize[1]))
+        pygame.image.save(image, save_path + '.jpg')
+        return save_path + '.jpg'
+    return None
 
 watched = loadWatched()
 frequencies = loadFrequencies()
@@ -251,6 +267,11 @@ class Gui:
             loadFolderToSlider(path, title=name)
             folderDict[name] = path
             saveFolderDict(folderDict)
+        elif key == 'Custom Artwork':
+            path = context.path
+            thumbnail = customArtwork(path)
+            if thumbnail:
+                context.setSurf(thumbnail)
 
     def handleEvents(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -320,6 +341,7 @@ class Gui:
                         menu.addButton('Mark Folder as unwatched', 'Mark Folder as unwatched')
                         menu.addButton('Open in explorer', 'Open in explorer')
                         menu.addButton('Create Slider', 'Create Slider')
+                        menu.addButton('Custom Artwork', 'Custom Artwork')
                         menu.finalize()
                         self.menu = menu
         elif event.type == pygame.KEYDOWN:
@@ -702,6 +724,10 @@ def checkThumbnail(filePath):
 
 def folderThumbnail(folderPath):
     """ return thumbnail as path string of a random file in folder """
+    # check if there is a thumbnail for the folder
+    folderThumbnailPath = ".\\assets\\thumbnails\\" + os.path.basename(folderPath) + '.jpg'
+    if os.path.exists(folderThumbnailPath):
+        return folderThumbnailPath
     thumbnails = []
     playable = findPlayableFiles(folderPath)
     for file in playable:
@@ -745,8 +771,8 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
     global watched
     frameSlider = FrameSlider(title, path=folderPath)
     for i, file in enumerate(os.listdir(folderPath)):
+        # folder
         if os.path.isdir(folderPath + '\\' + file):
-            # folder
             playables = findPlayableFiles(folderPath + '\\' + file)
             if len(playables) == 0:
                 # no playable files in folder
@@ -769,8 +795,8 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
             watchedPercentage = calculateFolderWatched(folderPath + '\\' + file)
             f.watched = watchedPercentage
             frameSlider.addFrame(f)
-        elif isAcceptableFormat(file):
-            # files
+        # file
+        elif isAcceptableFormat(file):    
             f = addFrame(folderPath + '\\' + file)
             frameSlider.addFrame(f)
     
