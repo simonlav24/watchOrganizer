@@ -288,13 +288,13 @@ class Gui:
                         path = self.selectedFrame.path
                         execute(path)
                         addToWatched(path)
-                        freq = self.selectedFrame.getFrequency()
-                        freq += 1
-                        setFrequency(path, freq)
                         self.selectedFrame.watched = 1
                     else:
                         # open folder
                         path = self.selectedFrame.path
+                        freq = self.selectedFrame.getFrequency()
+                        freq += 1
+                        setFrequency(path, freq)
                         sliderIndex = self.elements.index(self.selectedFrameSlider)
                         self.elements.remove(self.selectedFrameSlider)
                         loadFolderToSlider(path, sliderIndex, os.path.basename(path))
