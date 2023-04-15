@@ -5,6 +5,9 @@ import tkinter
 from tkinter import filedialog
 pygame.init()
 
+root = tkinter.Tk()
+root.withdraw() #use to hide tkinter window
+
 bgColor = (20,20,20)
 frameSize = (290, 164)
 
