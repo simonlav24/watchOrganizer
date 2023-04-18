@@ -58,13 +58,29 @@ def loadFrequencies():
             frequencies = ast.literal_eval(line)
     else:
         with open("frequencies.ini", "w+") as file:
-            file.write("")
+            file.write(r"{}")
     return frequencies
+
+def loadRatings():
+    ratings = {}
+    if os.path.exists("ratings.ini"):
+        with open("ratings.ini", "r") as file:
+            line = file.readline()
+            ratings = ast.literal_eval(line)
+    else:
+        with open("ratings.ini", "w+") as file:
+            file.write(r"{}")
+    return ratings
 
 def saveFrequencies():
     global frequencies
     with open("frequencies.ini", "w+") as file:
         file.write(str(frequencies))
+
+def saveRatings():
+    global ratings
+    with open("ratings.ini", "w+") as file:
+        file.write(str(ratings))
 
 def addToWatched(path):
     baseName = os.path.basename(path)
@@ -121,6 +137,18 @@ def setFrequency(path, freq):
     frequencies[path] = freq
     saveFrequencies()
 
+def getRating(path):
+    global ratings
+    if path in ratings:
+        return ratings[path]
+    else:
+        return 0
+    
+def setRating(path, rating):
+    global ratings
+    ratings[path] = rating
+    saveRatings()
+
 def customArtwork(path):
     file = tkinter.filedialog.askopenfile(mode ='r', filetypes =[('Image files', '*.png *.jpg *.jpeg *.bmp')])
     if file is not None: 
@@ -137,6 +165,7 @@ def customArtwork(path):
 
 watched = loadWatched()
 frequencies = loadFrequencies()
+ratings = loadRatings()
 
 folderDict = loadFolderDict()
 
@@ -154,6 +183,16 @@ folderIconSurf = pygame.transform.smoothscale(folderIconSurf, (folderIconSurf.ge
 highlightSurf = pygame.Surface((frameSize[0], frameSize[1]), pygame.SRCALPHA)
 pygame.draw.polygon(highlightSurf, (35,35,35), [(frameSize[0] * 0.6, 0), (frameSize[0] * 0.9, 0), (frameSize[0] * 0.9 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.6 - 0.3 * frameSize[0], frameSize[1])])
 pygame.draw.polygon(highlightSurf, (35,35,35), [(frameSize[0] * 0.45, 0), (frameSize[0] * 0.5, 0), (frameSize[0] * 0.5 - 0.3 * frameSize[0], frameSize[1]), (frameSize[0] * 0.45 - 0.3 * frameSize[0], frameSize[1])])
+
+starSurfs = [None]
+starSurfs.append(pygame.image.load('./assets/star.png').convert_alpha())
+starSurfs[1] = pygame.transform.smoothscale(starSurfs[1], (starSurfs[1].get_width()*0.5, starSurfs[1].get_height()*0.5))
+for i in range(2, 6):
+    surf = pygame.Surface((starSurfs[1].get_width() * i, starSurfs[1].get_height()), pygame.SRCALPHA)
+    for j in range(i):
+        surf.blit(starSurfs[1], (j * starSurfs[1].get_width(), 0))
+    starSurfs.append(surf)
+
 def execute(path):
     command = '"' + path + '"'
     print("executing:", command)
@@ -205,6 +244,7 @@ class Gui:
         self.menu = None
 
         self.stable = False
+        self.distableFlag = False
         AnimatorInit()
     def reposition(self):
         for i, element in enumerate(self.elements):
@@ -214,6 +254,9 @@ class Gui:
         self.selectedFrame = frame
     def step(self):
         self.stable = True
+        if self.distableFlag:
+            self.distableFlag = False
+            self.stable = False
         # step for elements
         for element in self.elements:
             element.step()
@@ -239,6 +282,7 @@ class Gui:
                 self.selectedFrameSlider = None
         # step for menu
         if self.menu:
+            self.distable()
             self.menu.step()
     def draw(self):
         for element in self._instance.elements:
@@ -251,6 +295,7 @@ class Gui:
             self.menu.draw()
     def handleMenuEvents(self, key):
         context = self.menu.context
+        self.menu.done = True
         if key == 'Mark as unwatched':
             removeFromWatched(context.path)
             context.watched = 0
@@ -275,9 +320,22 @@ class Gui:
             thumbnail = customArtwork(path)
             if thumbnail:
                 context.setSurf(thumbnail)
+        elif key == 'Rate':
+            menu = Menu(event.pos, context)
+            menu.addButtonImage('1 stars', starSurfs[1])
+            menu.addButtonImage('2 stars', starSurfs[2])
+            menu.addButtonImage('3 stars', starSurfs[3])
+            menu.addButtonImage('4 stars', starSurfs[4])
+            menu.addButtonImage('5 stars', starSurfs[5])
+            menu.finalize()
+            self.menu = menu
+        elif 'stars' in key:
+            stars = int(key[0])
+            setRating(context.path, stars)
 
     def handleEvents(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
+            self.distable()
             if event.button == 1:
                 mouse = event.pos
                 if self.menu:
@@ -287,7 +345,8 @@ class Gui:
                     else:
                         key = self.menu.handleEvents(event)
                         self.handleMenuEvents(key)
-                    self.menu = None
+                    if self.menu and self.menu.done:
+                        self.menu = None
                     return
                 # slide
                 if self.selectedFrameSlider:
@@ -335,6 +394,7 @@ class Gui:
                         else:
                             menu.addButton('Mark as watched', 'Mark as watched')
                         menu.addButton('Open in explorer', 'Open in explorer')
+                        menu.addButton('Rate', 'Rate')
                         menu.finalize()
                         self.menu = menu
                     else:
@@ -362,6 +422,7 @@ class Gui:
                     saveFolderDict(folderDict)
     def distable(self):
         self.stable = False
+        self.distableFlag = True
 
 class FrameSlider:
     """
@@ -497,6 +558,7 @@ class Frame:
         self.animationState = "idle"
         self.animOffsets = [0,0]
         self.stable = False
+    
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
@@ -542,6 +604,9 @@ class Frame:
     def getFrequency(self):
         global frequencies
         return getFrequency(self.path)
+    def getRating(self):
+        global ratings
+        return getRating(self.path)
     def step(self):
         mouse = pygame.mouse.get_pos()
         if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + frameSize[0]\
@@ -560,22 +625,19 @@ class Frame:
             self.animOffsets[0] += (1 - self.animOffsets[0]) * 0.1
             self.animOffsets[1] += (1 - self.animOffsets[1]) * 0.1
 
-        if self.animOffsets[0] < 0.001 or self.animOffsets[1] < 0.001:
+        if self.animOffsets[0] < 0.00001 or self.animOffsets[1] < 0.00001:
             self.stable = True
         else:
             self.stable = False
     def draw(self):
-        if not self.stable:
-            surf = self.surf.copy()
-            posx =  self.animOffsets[0] * frameSize[0] - frameSize[0] - 35
-            surf.blit(highlightSurf, (posx,0), special_flags=pygame.BLEND_RGBA_ADD)
-            scale = 1 + self.animOffsets[1] * 0.2
-            surf = pygame.transform.smoothscale(surf, (int(frameSize[0] * scale), int(frameSize[1] * scale)))
-            posOffset = (int(frameSize[0] * (1 - scale) / 2), int(frameSize[1] * (1 - scale) / 2))
-            win.blit(surf, self.pos + posOffset)
-        else:
-            win.blit(self.surf, self.pos)
-        
+        # draw rating
+        if self.getRating() != 0:
+            rating = self.getRating()
+            x = self.pos[0] + frameSize[0] // 2 - starSurfs[rating].get_width() // 2
+            y = self.pos[1] + frameSize[1] - starSurfs[rating].get_height() - 5 + self.animOffsets[0] * 68
+            win.blit(starSurfs[rating], (x, y))
+
+        # draw watch indicator
         if self.watched != 0: 
             start = self.pos + Vector(frameSize[0]/2 - 80, frameSize[1] + 10)
             start.y += self.animOffsets[0] * 15
@@ -584,14 +646,28 @@ class Frame:
             pygame.draw.line(win, (91,91,91), start, end, 3)
             pygame.draw.line(win, RED, start, start + (end - start) * self.watched, 3)
 
+        # draw frame
+        surf = self.surf.copy()
+        posx =  self.animOffsets[0] * frameSize[0] - frameSize[0] - 35
+        surf.blit(highlightSurf, (posx,0), special_flags=pygame.BLEND_RGBA_ADD)
+        scale = 1 + self.animOffsets[1] * 0.2
+        surf = pygame.transform.smoothscale(surf, (int(frameSize[0] * scale), int(frameSize[1] * scale)))
+        posOffset = (int(frameSize[0] * (1 - scale) / 2), int(frameSize[1] * (1 - scale) / 2))
+        win.blit(surf, self.pos + posOffset)
+
 class Menu:
     def __init__(self, pos, context):
         self.pos = tup2vec(pos)
         self.size = Vector()
         self.elements = []
         self.context = context
+        self.done = False
     def addButton(self, key, text):
         button = MenuButton(text, key)
+        self.elements.append(button)
+        self.recalculate()
+    def addButtonImage(self, key, image):
+        button = MenuButtonImage(image, key)
         self.elements.append(button)
         self.recalculate()
     def finalize(self):
@@ -653,6 +729,23 @@ class MenuButton:
             self.selected = True
         else:
             self.selected = False
+
+class MenuButtonImage(MenuButton):
+    def __init__(self, image, key):
+        self.key = key
+        self.image = image
+
+        self.pos = Vector()
+        self.size = Vector()
+
+        self.selected = False
+        self.setTextSurf()
+    def setTextSurf(self):
+        self.size = Vector(self.image.get_width() + 20, self.image.get_height() + 20)
+    def draw(self):
+        if self.selected:
+            pygame.draw.rect(win, (255,255,255), (self.pos, self.size))
+        win.blit(self.image, (self.pos[0] + 10 , self.pos[1] + self.size[1]/2 - self.image.get_height()/2))
 
 def createThumbnail(filePath):
     """ returns thumbnail Surface from path file """
