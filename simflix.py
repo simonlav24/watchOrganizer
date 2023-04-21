@@ -11,9 +11,8 @@ root.withdraw() #use to hide tkinter window
 bgColor = (20,20,20)
 frameSize = (290, 164)
 
-imagesFormats = ['png', 'jpg', 'jpeg', 'bmp']
-videoFormats = ['mp4', 'avi', 'mov', 'flv', 'wmv', 'mpg', 'mpeg', 'mkv']
-acceptableFormats = imagesFormats + videoFormats
+formatDict = {'imagesFormats': ['png', 'jpg', 'jpeg', 'bmp'], 'videoFormats': ['mp4', 'avi', 'mov', 'flv', 'wmv', 'mpg', 'mpeg', 'mkv']}
+acceptableFormats = [formatDict[key] for key in formatDict]
 
 class FontStrokeDeco:
     def __init__(self, font):
@@ -106,14 +105,20 @@ def removeFromWatched(path):
                 file.write(name + "\n")
 
 def loadFolderDict():
+    global acceptableFormats
     folderDict = {}
     if os.path.exists("folders.ini"):
         with open("folders.ini", "r") as file:
             line = file.readline()
             folderDict = ast.literal_eval(line)
+            if 'AcceptableFormats' in folderDict:
+                formats = folderDict['AcceptableFormats']
+                acceptableFormats = []
+                for formatGroup in formats:
+                    acceptableFormats += formatDict[formatGroup]
     else:
         with open("folders.ini", "w+") as file:
-            example_dict = {'Title': 'path'}
+            example_dict = {'Title': 'path', 'AcceptableFormats': ['imagesFormats', 'videoFormats']}
             file.write(str(example_dict))
     return folderDict
 
@@ -147,6 +152,9 @@ def getRating(path):
 def setRating(path, rating):
     global ratings
     ratings[path] = rating
+    if rating == 0:
+        if path in ratings:
+            del ratings[path]
     saveRatings()
 
 def customArtwork(path):
@@ -175,6 +183,7 @@ win = pygame.display.set_mode(screenSize, pygame.RESIZABLE)
 clock = pygame.time.Clock()
 fps = 60
 pygame.display.set_caption('Simflix')
+pygame.display.set_icon(pygame.image.load('./assets/simflixIcon.png'))
 simflixSurf = pygame.image.load('./assets/simflix.png').convert_alpha()
 simflixSurf = pygame.transform.smoothscale(simflixSurf, (simflixSurf.get_width()*0.4, simflixSurf.get_height()*0.4))
 folderIconSurf = pygame.image.load('./assets/folderIcon.png').convert_alpha()
@@ -320,8 +329,11 @@ class Gui:
             thumbnail = customArtwork(path)
             if thumbnail:
                 context.setSurf(thumbnail)
+        elif key == 'Remove Rating':
+            setRating(context.path, 0)
         elif key == 'Rate':
             menu = Menu(event.pos, context)
+            menu.addButton('Remove Rating', 'Remove Rating')
             menu.addButtonImage('1 stars', starSurfs[1])
             menu.addButtonImage('2 stars', starSurfs[2])
             menu.addButtonImage('3 stars', starSurfs[3])
@@ -851,9 +863,9 @@ def calculateFolderWatched(folderPath):
 def addFrame(filePath):
     """ add image frame to slider """
     f = Frame()
-    if os.path.splitext(filePath)[1].replace('.', '') in imagesFormats:
+    if os.path.splitext(filePath)[1].replace('.', '') in formatDict['imagesFormats']:
         f.setSurf(filePath, name=os.path.basename(filePath))
-    elif os.path.splitext(filePath)[1].replace('.', '') in videoFormats:
+    elif os.path.splitext(filePath)[1].replace('.', '') in formatDict['videoFormats']:
         thumbnail = checkAndCreateThumbnailSurf(filePath)
         f.setSurf(color=(20, 9, 229), name=os.path.basename(filePath), surf=thumbnail)
     f.path = filePath
@@ -931,6 +943,8 @@ def openInExplorer(path):
 def init():
     for folder in folderDict:
         path = folderDict[folder]
+        if folder == 'AcceptableFormats':
+            continue
         loadFolderToSlider(path, title=folder)
 
 Gui()
