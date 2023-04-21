@@ -36,6 +36,7 @@ arrow = [(0,14), (12,0), (14,2), (4,14), (14,26), (12,28)]
 arrowSize = Vector(14, 28)
 
 RED = (229,9,20)
+SCROLL_SPEED = 50
 
 def isAcceptableFormat(fileName):
     return fileName.split('.')[-1] in acceptableFormats
@@ -254,6 +255,7 @@ class Gui:
 
         self.stable = False
         self.distableFlag = False
+        self.scroll = 0
         AnimatorInit()
     def reposition(self):
         for i, element in enumerate(self.elements):
@@ -261,6 +263,17 @@ class Gui:
             element.reposition()
     def select(self, frame):
         self.selectedFrame = frame
+    def scrollUp(self):
+        self.scroll += SCROLL_SPEED
+        if self.scroll > 0:
+            self.scroll = 0
+            return
+        for element in self.elements:
+            element.scrollUp()
+    def scrollDown(self):
+        self.scroll -= SCROLL_SPEED
+        for element in self.elements:
+            element.scrollDown()
     def step(self):
         self.stable = True
         if self.distableFlag:
@@ -305,6 +318,8 @@ class Gui:
     def handleMenuEvents(self, key):
         context = self.menu.context
         self.menu.done = True
+        if key is None:
+            return
         if key == 'Mark as unwatched':
             removeFromWatched(context.path)
             context.watched = 0
@@ -419,6 +434,10 @@ class Gui:
                         menu.addButton('Custom Artwork', 'Custom Artwork')
                         menu.finalize()
                         self.menu = menu
+            elif event.button == 4:
+                self.scrollUp()
+            elif event.button == 5:
+                self.scrollDown()
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_DELETE:
                 if self.selectedFrameSlider:
@@ -450,7 +469,14 @@ class FrameSlider:
         self.selected = False
         self.path = path
         self.stable = False
+    def scrollUp(self):
+        self.pos.y += SCROLL_SPEED
+        self.reposition()
 
+    def scrollDown(self):
+        self.pos.y -= SCROLL_SPEED
+        self.reposition()
+        
     def addFrame(self, frame):
         frame.parent = self
         pos = Vector(len(self.frames) * (8 + frameSize[0]), 5 + self.titleSurf.get_height())
@@ -876,6 +902,9 @@ def addFrame(filePath):
 
 def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
     """ create slider of all files in folder """
+    if not os.path.isdir(folderPath):
+        print('[ERROR] folder', folderPath, 'does not exist')
+        return
     global watched
     frameSlider = FrameSlider(title, path=folderPath)
     for i, file in enumerate(os.listdir(folderPath)):
@@ -971,8 +1000,10 @@ while not done:
     # draw
     if not Gui().stable:
         win.fill(bgColor)
-        win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
+        
         Gui().draw()
+        win.fill(bgColor, (0, 0, win.get_width(), 100))
+        win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
 
         pygame.display.update()
         clock.tick(fps)
