@@ -788,7 +788,7 @@ class MenuButtonImage(MenuButton):
 def createThumbnail(filePath):
     """ returns thumbnail Surface from path file """
     file_extension = os.path.splitext(filePath)[1]
-    if file_extension.replace('.', '') in imagesFormats:
+    if file_extension.replace('.', '') in formatDict['imagesFormats']:
         frame = pygame.image.load(filePath)
         return frame
     importedVideo = cv2.VideoCapture(filePath)
