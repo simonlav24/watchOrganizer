@@ -30,7 +30,7 @@ class FontStrokeDeco:
         return bg
 
 titleFont = pygame.font.SysFont('Tahoma', 26, True)
-nameFont = FontStrokeDeco(pygame.font.SysFont('Tahoma', 16, False))
+nameFont = FontStrokeDeco(pygame.font.SysFont('Segoe UI Black', 16, False))
 
 arrow = [(0,14), (12,0), (14,2), (4,14), (14,26), (12,28)]
 arrowSize = Vector(14, 28)
@@ -51,12 +51,16 @@ def loadWatched():
     return watched
 
 def loadFrequencies():
+    success = True
     frequencies = {}
     if os.path.exists("frequencies.ini"):
         with open("frequencies.ini", "r") as file:
             line = file.readline()
-            frequencies = ast.literal_eval(line)
-    else:
+            try:
+                frequencies = ast.literal_eval(line)
+            except:
+                success = False
+    if not success:
         with open("frequencies.ini", "w+") as file:
             file.write(r"{}")
     return frequencies
@@ -485,7 +489,10 @@ class FrameSlider:
     
     def reposition(self):
         for i, frame in enumerate(self.frames):
-            frame.setPos(Vector(i * (8 + frameSize[0]), 5 + self.titleSurf.get_height()))
+            index = i - self.slideIndex
+            x = index * (8 + frameSize[0])
+            y = 5 + self.titleSurf.get_height()
+            frame.setPos(Vector(x, y))
 
     def step(self):
         self.stable = True
@@ -596,7 +603,6 @@ class Frame:
         self.animationState = "idle"
         self.animOffsets = [0,0]
         self.stable = False
-    
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
@@ -632,7 +638,10 @@ class Frame:
         if name:
             name = handleName(name)
             nameSurf = nameFont.render(name, True, (255,255,255))
-            self.surf.blit(nameSurf, (frameSize[0]/2 - nameSurf.get_width()/2, frameSize[1] - nameSurf.get_height()))
+            if nameSurf.get_width() > self.surf.get_width():
+                self.surf.blit(nameSurf, (10, frameSize[1] - nameSurf.get_height()))
+            else:
+                self.surf.blit(nameSurf, (frameSize[0]/2 - nameSurf.get_width()/2, frameSize[1] - nameSurf.get_height()))
 
         # add border
         borderMask = pygame.Surface(frameSize, pygame.SRCALPHA)
@@ -785,6 +794,9 @@ class MenuButtonImage(MenuButton):
             pygame.draw.rect(win, (255,255,255), (self.pos, self.size))
         win.blit(self.image, (self.pos[0] + 10 , self.pos[1] + self.size[1]/2 - self.image.get_height()/2))
 
+def factorToSize(factor, orgSize):
+    return (orgSize[0] * factor, orgSize[1] * factor)
+
 def createThumbnail(filePath):
     """ returns thumbnail Surface from path file """
     file_extension = os.path.splitext(filePath)[1]
@@ -826,16 +838,35 @@ def checkAndCreateThumbnailSurf(filePath):
 
     if not os.path.exists(thumbnailPath):
         thumbnail = createThumbnail(filePath)
+        frame_surf = pygame.Surface(frameSize)
         if not thumbnail:
             return None
-        if thumbnail.get_width() > thumbnail.get_height():
-            new_size = (frameSize[0], frameSize[0] * thumbnail.get_height() // thumbnail.get_width())
-            try:
-                thumbnail = pygame.transform.smoothscale(thumbnail, new_size)
-            except ValueError:
-                thumbnail = pygame.transform.scale(thumbnail, new_size)
+        
+        new_size = (0,0)
+        location = (0,0)
+
+        # scale by width:
+        new_width = frameSize[0]
+        new_height = int(thumbnail.get_height() * (frameSize[0] / thumbnail.get_width()))
+        if new_height > frameSize[1]:
+            new_size = (new_width, new_height)
+            location = (0, -(new_height - frameSize[1]) // 2)
         else:
-            thumbnail = pygame.transform.smoothscale(thumbnail, (frameSize[1] * thumbnail.get_width() // thumbnail.get_height(), frameSize[1]))
+            # scale by height
+            new_height = frameSize[1]
+            new_width = int(thumbnail.get_width() * (frameSize[1] / thumbnail.get_height()))
+            new_size = (new_width, new_height)
+            location = (-(new_width - frameSize[0]) // 2, 0)
+
+        # scale down thumbnail
+        try:
+            thumbnail = pygame.transform.smoothscale(thumbnail, new_size)
+        except ValueError:
+            thumbnail = pygame.transform.scale(thumbnail, new_size)
+
+        frame_surf.blit(thumbnail, location)
+        thumbnail = frame_surf
+
         pygame.image.save(thumbnail, thumbnailPath)
 
     else:
