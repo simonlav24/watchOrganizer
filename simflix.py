@@ -263,7 +263,7 @@ class Gui:
         AnimatorInit()
     def reposition(self):
         for i, element in enumerate(self.elements):
-            element.pos = Vector(5, 100 + i * (frameSize[1] + 100))
+            element.pos = Vector(5, 100 + i * (frameSize[1] + 100) + self.scroll)
             element.reposition()
     def select(self, frame):
         self.selectedFrame = frame
