@@ -363,6 +363,21 @@ class Gui:
         elif 'stars' in key:
             stars = int(key[0])
             setRating(context.path, stars)
+        elif 'Change Thumbnail' in key:
+            path = context.path
+            menu = Menu(event.pos, context)
+            menu.addButtonImage('0.16 thumb', pygame.transform.scale(createThumbnail(path, 0.16), (200,100)))
+            menu.addButtonImage('0.33 thumb', pygame.transform.scale(createThumbnail(path, 0.33), (200,100)))
+            menu.addButtonImage('0.5 thumb', pygame.transform.scale(createThumbnail(path, 0.5), (200,100)))
+            menu.addButtonImage('0.66 thumb', pygame.transform.scale(createThumbnail(path, 0.66), (200,100)))
+            menu.addButtonImage('0.83 thumb', pygame.transform.scale(createThumbnail(path, 0.83), (200,100)))
+            menu.finalize()
+            self.menu = menu
+        elif 'thumb' in key:
+            seek = float(key.split()[0])
+            thumbnail = checkAndCreateThumbnailSurf(context.path, seek, force=True)
+            context.setSurf(surf=thumbnail, name=context.nameStr)
+
 
     def handleEvents(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -425,6 +440,7 @@ class Gui:
                         else:
                             menu.addButton('Mark as watched', 'Mark as watched')
                         menu.addButton('Open in explorer', 'Open in explorer')
+                        menu.addButton('Change Thumbnail', 'Change Thumbnail')
                         menu.addButton('Rate', 'Rate')
                         menu.finalize()
                         self.menu = menu
@@ -603,6 +619,7 @@ class Frame:
         self.animationState = "idle"
         self.animOffsets = [0,0]
         self.stable = False
+        self.nameStr = None
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
@@ -637,6 +654,7 @@ class Frame:
         # blit name
         if name:
             name = handleName(name)
+            self.nameStr = name
             nameSurf = nameFont.render(name, True, (255,255,255))
             if nameSurf.get_width() > self.surf.get_width():
                 self.surf.blit(nameSurf, (10, frameSize[1] - nameSurf.get_height()))
@@ -797,7 +815,7 @@ class MenuButtonImage(MenuButton):
 def factorToSize(factor, orgSize):
     return (orgSize[0] * factor, orgSize[1] * factor)
 
-def createThumbnail(filePath):
+def createThumbnail(filePath, seek=0.5):
     """ returns thumbnail Surface from path file """
     file_extension = os.path.splitext(filePath)[1]
     if file_extension.replace('.', '') in formatDict['imagesFormats']:
@@ -807,7 +825,7 @@ def createThumbnail(filePath):
     width = int(importedVideo.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(importedVideo.get(cv2.CAP_PROP_FRAME_HEIGHT))
     length = int(importedVideo.get(cv2.CAP_PROP_FRAME_COUNT))
-    importedVideo.set(cv2.CAP_PROP_POS_FRAMES, length // 2)
+    importedVideo.set(cv2.CAP_PROP_POS_FRAMES, int(length * seek))
     ret, frame = importedVideo.read()
     if ret == False:
         return None
@@ -827,7 +845,7 @@ def checkAndCreateThumbnailPath(filePath):
     checkAndCreateThumbnailSurf(filePath)
     return thumbnailPath
 
-def checkAndCreateThumbnailSurf(filePath):
+def checkAndCreateThumbnailSurf(filePath, seek=0.5, force=False):
     """ check if there is a tumbnail, if there is, return it as Surface, if not, create one and return it """
     fileName = os.path.basename(filePath)
 
@@ -836,8 +854,8 @@ def checkAndCreateThumbnailSurf(filePath):
 
     thumbnailPath = "./assets/thumbnails/" + fileName.replace('.' + fileName.split('.')[-1], '') + '.jpg'
 
-    if not os.path.exists(thumbnailPath):
-        thumbnail = createThumbnail(filePath)
+    if not os.path.exists(thumbnailPath) or force:
+        thumbnail = createThumbnail(filePath, seek)
         frame_surf = pygame.Surface(frameSize)
         if not thumbnail:
             return None
@@ -1021,6 +1039,10 @@ while not done:
                 Gui().selectedFrameSlider.slide('left')
             elif event.key == pygame.K_RIGHT:
                 Gui().selectedFrameSlider.slide('right')
+            elif event.key == pygame.K_UP:
+                Gui().scrollUp()
+            elif event.key == pygame.K_DOWN:
+                Gui().scrollDown()
     keys = pygame.key.get_pressed()
     if keys[pygame.K_ESCAPE]:
         done = True
