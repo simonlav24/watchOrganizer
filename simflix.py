@@ -252,7 +252,7 @@ class Gui:
         return cls._instance
     def initiate(self):
         self.elements = []
-        self.animations = []
+        self.animation = None
         self.selectedFrame = None
         self.selectedFrameSlider = None
         self.menu = None
@@ -289,14 +289,12 @@ class Gui:
             if not element.stable:
                 self.stable = False
         # step for animations
-        finishedAnimations = []
-        for animation in self.animations:
-            animation.step()
+        if self.animation:
+            self.animation.step()
             self.stable = False
-            if animation.finished:
-                finishedAnimations.append(animation)
-        for animation in finishedAnimations:
-            self.animations.remove(animation)
+            if self.animation.finished:
+                self.animation = None
+
         # step for selected frame
         if self.selectedFrame:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
@@ -537,6 +535,8 @@ class FrameSlider:
         if self.selected:
             self.drawArrows()
     def slide(self, button):
+        if Gui().animation:
+            return
         framesInWin = win.get_width() // (frameSize[0] + 8)
         slideOffset = 0
         animate = True
@@ -563,7 +563,7 @@ class FrameSlider:
 
 class AnimatorInit:
     def __init__(self):
-        Gui().animations.append(self)
+        Gui().animation = self
         self.stable = False
         self.finished = False
     def step(self):
@@ -577,7 +577,7 @@ class AnimatorSlider:
         Animates a slider to move
     """
     def __init__(self, slider, offset):
-        Gui().animations.append(self)
+        Gui().animation = self
         self.slider = slider
         self.offset = offset
 
