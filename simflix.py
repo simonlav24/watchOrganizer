@@ -457,6 +457,7 @@ class Gui:
             elif event.button == 5:
                 self.scrollDown()
         elif event.type == pygame.KEYDOWN:
+            self.distable()
             if event.key == pygame.K_DELETE:
                 if self.selectedFrameSlider:
                     # remove the frame slider
