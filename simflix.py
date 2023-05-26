@@ -268,6 +268,7 @@ class Gui:
     def select(self, frame):
         self.selectedFrame = frame
     def scrollUp(self):
+        self.distable()
         self.scroll += SCROLL_SPEED
         if self.scroll > 0:
             self.scroll = 0
@@ -275,6 +276,7 @@ class Gui:
         for element in self.elements:
             element.scrollUp()
     def scrollDown(self):
+        self.distable()
         self.scroll -= SCROLL_SPEED
         for element in self.elements:
             element.scrollDown()
@@ -1030,6 +1032,9 @@ Gui()
 init()
 
 done = False
+hold_key = False
+hold_timer = 0
+
 while not done:
     for event in pygame.event.get():
         Gui().handleEvents(event)
@@ -1044,10 +1049,21 @@ while not done:
                 Gui().scrollUp()
             elif event.key == pygame.K_DOWN:
                 Gui().scrollDown()
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
+                hold_timer = 0
     keys = pygame.key.get_pressed()
     if keys[pygame.K_ESCAPE]:
         done = True
-
+    
+    if keys[pygame.K_UP]:
+        hold_timer += 1
+        if hold_timer > 25 and hold_timer % 3 == 0:
+            Gui().scrollUp()
+    if keys[pygame.K_DOWN]:
+        hold_timer += 1
+        if hold_timer > 25 and hold_timer % 3 == 0:
+            Gui().scrollDown()
     # step
     Gui().step()
 
@@ -1059,7 +1075,7 @@ while not done:
         win.fill(bgColor, (0, 0, win.get_width(), 100))
         win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
 
-        pygame.display.update()
-        clock.tick(fps)
+    pygame.display.update()
+    clock.tick(fps)
     
 pygame.quit()
