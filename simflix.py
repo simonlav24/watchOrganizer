@@ -3,7 +3,39 @@ from vector import *
 from timeit import default_timer as timer
 import tkinter
 from tkinter import filedialog
+import threading
 pygame.init()
+
+
+class ThreadPool:
+    _single = None
+    def __init__(self):
+        ThreadPool._single = self
+        self.thread_count = 4
+        self.que = []
+        self.threads_running = 0
+    def step(self):
+        if len(self.que) == 0:
+            return
+        if self.threads_running < self.thread_count:
+            thread = self.que.pop(0)
+            t = threading.Thread(target=thread[0], args=thread[1])
+            t.start()
+            self.threads_running += 1
+        print('que:', len(self.que))
+        print('running:', self.threads_running)
+    def addThread(self, thread):
+        self.que.append(thread)
+
+def thread_getThumbnail(frame):
+    path = frame.path
+    thumbnail = checkAndCreateThumbnailSurf(path)
+
+    frame.setSurf(color=(20, 9, 229), name=os.path.basename(path), surf=thumbnail)
+    # done
+    ThreadPool._single.threads_running -= 1
+
+ThreadPool()
 
 root = tkinter.Tk()
 root.withdraw() #use to hide tkinter window
@@ -609,20 +641,23 @@ class Frame:
     """
         A frame is a single icon with an image that can be selected and clicked
     """
-    def __init__(self, folder=False):
+    def __init__(self, path=None, folder=False):
         self.pos = Vector(0,0)
 
         self.folder = folder
         self.setSurf()
         self.selected = False
         self.parent = None
-        self.path = None
+        self.path = path
 
         self.watched = 0
         self.animationState = "idle"
         self.animOffsets = [0,0]
         self.stable = False
         self.nameStr = None
+
+        ThreadPool._single.addThread((thread_getThumbnail, [self]))
+                
     def setPos(self, pos):
         self.pos = self.parent.pos + pos
     def setSurf(self, imagePath=None, color=(255,255,255), name=None, surf=None):
@@ -676,6 +711,7 @@ class Frame:
         global ratings
         return getRating(self.path)
     def step(self):
+
         mouse = pygame.mouse.get_pos()
         if mouse[0] > self.pos[0] and mouse[0] <= self.pos[0] + frameSize[0]\
                 and mouse[1] > self.pos[1] and mouse[1] <= self.pos[1] + frameSize[1]:
@@ -940,13 +976,12 @@ def calculateFolderWatched(folderPath):
 
 def addFrame(filePath):
     """ add image frame to slider """
-    f = Frame()
-    if os.path.splitext(filePath)[1].replace('.', '') in formatDict['imagesFormats']:
-        f.setSurf(filePath, name=os.path.basename(filePath))
-    elif os.path.splitext(filePath)[1].replace('.', '') in formatDict['videoFormats']:
-        thumbnail = checkAndCreateThumbnailSurf(filePath)
-        f.setSurf(color=(20, 9, 229), name=os.path.basename(filePath), surf=thumbnail)
-    f.path = filePath
+    f = Frame(filePath)
+    # if os.path.splitext(filePath)[1].replace('.', '') in formatDict['imagesFormats']:
+    #     f.setSurf(filePath, name=os.path.basename(filePath))
+    # elif os.path.splitext(filePath)[1].replace('.', '') in formatDict['videoFormats']:
+    #     thumbnail = checkAndCreateThumbnailSurf(filePath)
+    #     f.setSurf(color=(20, 9, 229), name=os.path.basename(filePath), surf=thumbnail)
     baseName = os.path.basename(filePath)
     if baseName in watched:
         f.watched = 1
@@ -972,14 +1007,13 @@ def loadFolderToSlider(folderPath, sliderIndex=-1, title="untitled"):
                 frameSlider.addFrame(f)
                 continue
 
-            f = Frame(folder=True)
-            thumbnail = folderThumbnail(folderPath + '\\' + file)
+            f = Frame(folderPath + '\\' + file, folder=True)
+            # thumbnail = folderThumbnail(folderPath + '\\' + file)
 
-            if thumbnail:
-                f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '\\' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
-            else:
-                f.setSurf(color=RED, name=os.path.basename(folderPath + '\\' + file))
-            f.path = folderPath + '\\' + file
+            # if thumbnail:
+            #     f.setSurf(color=(20, 9, 229), name=os.path.basename(folderPath + '\\' + file), surf=checkAndCreateThumbnailSurf(thumbnail))
+            # else:
+            #     f.setSurf(color=RED, name=os.path.basename(folderPath + '\\' + file))
             # configure watched amount
             watchedPercentage = calculateFolderWatched(folderPath + '\\' + file)
             f.watched = watchedPercentage
@@ -1066,14 +1100,15 @@ while not done:
             Gui().scrollDown()
     # step
     Gui().step()
+    ThreadPool._single.step()
 
     # draw
-    if not Gui().stable:
-        win.fill(bgColor)
+    # if not Gui().stable:
+    win.fill(bgColor)
         
-        Gui().draw()
-        win.fill(bgColor, (0, 0, win.get_width(), 100))
-        win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
+    Gui().draw()
+    win.fill(bgColor, (0, 0, win.get_width(), 100))
+    win.blit(simflixSurf, (win.get_width() - simflixSurf.get_width() - 20, 20))
 
     pygame.display.update()
     clock.tick(fps)
