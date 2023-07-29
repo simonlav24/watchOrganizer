@@ -1041,10 +1041,11 @@ while not done:
         if event.type == pygame.QUIT:
             done = True
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                Gui().selectedFrameSlider.slide('left')
-            elif event.key == pygame.K_RIGHT:
-                Gui().selectedFrameSlider.slide('right')
+            if Gui().selectedFrameSlider:
+                if event.key == pygame.K_LEFT:
+                    Gui().selectedFrameSlider.slide('left')
+                elif event.key == pygame.K_RIGHT:
+                    Gui().selectedFrameSlider.slide('right')
             elif event.key == pygame.K_UP:
                 Gui().scrollUp()
             elif event.key == pygame.K_DOWN:
