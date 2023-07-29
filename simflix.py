@@ -1046,7 +1046,7 @@ while not done:
                     Gui().selectedFrameSlider.slide('left')
                 elif event.key == pygame.K_RIGHT:
                     Gui().selectedFrameSlider.slide('right')
-            elif event.key == pygame.K_UP:
+            if event.key == pygame.K_UP:
                 Gui().scrollUp()
             elif event.key == pygame.K_DOWN:
                 Gui().scrollDown()
